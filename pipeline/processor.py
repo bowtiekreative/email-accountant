@@ -19,6 +19,23 @@ from typing import Optional, Tuple, Dict, Any, List
 # Google Play / PayPal merchant names → (domain, transaction_type, category)
 # These are extracted from PayPal "PAYPAL *MERCHANT" strings and Google Play subjects.
 MERCHANT_CATEGORIES = {
+    # === SCAM / FRAUD / FAKE INVOICES ===
+    'smartdollarsclub': ('personal', 'expense', 'Suspected Scam'),
+    'yourdomain': ('personal', 'expense', 'Suspected Scam'),
+    'proton.me': ('personal', 'expense', 'Suspected Scam'),
+
+    # === PERSONAL: Loans & Financing ===
+    'moneymart': ('personal', 'expense', 'Loans & Financing'),
+    'capitalone': ('personal', 'expense', 'Loans & Financing'),
+    'telus': ('personal', 'expense', 'Internet & Telecom'),
+    'urbansuites': ('business', 'income', 'Client Payments'),
+    'shutterstock': ('business', 'expense', 'Professional Services'),
+
+    # === PERSONAL: Entertainment ===
+    'playstation': ('personal', 'expense', 'Entertainment'),
+    'samsung': ('personal', 'expense', 'Marketing'),
+    'skrill': ('personal', 'expense', 'Shopping'),
+
     # === BUSINESS: Software & Subscriptions ===
     'slack': ('business', 'expense', 'Software & Subscriptions'),
     'github': ('business', 'expense', 'Software & Subscriptions'),
@@ -220,6 +237,30 @@ SENDER_CLASSIFICATION = {
     'ancestry@email.ancestry.ca': ('personal', 'expense', 'Entertainment', 0.85),
     'udemy@email.udemy.com': ('business', 'expense', 'Software & Subscriptions', 0.85),
     'paypal@emails.paypal.com': ('personal', 'expense', 'Shopping', 0.50),  # Promotional/rewards emails
+    # === SCAM / FRAUD SENDERS ===
+    'earn@smartdollarsclub.com': ('personal', 'expense', 'Suspected Scam', 0.30),
+    'info@yourdomain.com': ('personal', 'expense', 'Suspected Scam', 0.30),
+    'oaitsehellard@gmail.com': ('personal', 'expense', 'Suspected Scam', 0.30),
+    # === MISSING LEGITIMATE SENDERS ===
+    'no-reply@email1.samsung.ca': ('personal', 'expense', 'Marketing', 0.50),
+    'serviceonline@moneymart.ca': ('personal', 'expense', 'Loans & Financing', 0.90),
+    'donotreply@topleaf.ca': ('personal', 'expense', 'Shopping', 0.80),
+    'noreply@shutterstock.com': ('business', 'expense', 'Professional Services', 0.90),
+    'promotions@telus.com': ('personal', 'expense', 'Internet & Telecom', 0.80),
+    'capitalone@notification.capitalone.com': ('personal', 'expense', 'Loans & Financing', 0.85),
+    'txn-email.playstation': ('personal', 'expense', 'Entertainment', 0.95),
+    'txn-email03.playstation': ('personal', 'expense', 'Entertainment', 0.95),
+    'email.skrill': ('personal', 'expense', 'Shopping', 0.80),
+    'elaine@urbansuites.com': ('business', 'income', 'Client Payments', 0.90),
+    'kennysicrad96@gmail.com': ('personal', 'expense', 'Suspected Scam', 0.30),
+    'support@bcsupport.zendesk.com': ('business', 'expense', 'Professional Services', 0.85),
+    'notification@mailsuite.com': ('unknown', 'expense', 'unresolved', 0.40),
+    'transactional@mailing.image': ('unknown', 'expense', 'unresolved', 0.30),
+    'reply@txn-email.playstation.com': ('personal', 'expense', 'Entertainment', 0.95),
+    'no-reply@email.skrill.com': ('personal', 'expense', 'Shopping', 0.80),
+    'mdaj88631@gmail.com': ('personal', 'expense', 'Shopping', 0.50),
+    # Forwarded emails from own address — amounts are from old forwarded content
+    'theapprentice4@gmail.com': ('unknown', 'expense', 'unresolved', 0.30),
 }
 
 # Stripe sender patterns (these send payment receipts, invoices, failed payments)
@@ -300,6 +341,18 @@ def classify_merchant(name: str, description: str = "", amount: float = 0.0, fro
     name_lower = (name or "").lower().strip()
     desc_lower = (description or "").lower()
     from_lower = (from_email or "").lower()
+    
+    # 0a. Skip bounced / undeliverable system emails
+    if 'system administrator' in from_lower and 'undeliverable' in desc_lower:
+        return ('unknown', 'expense', 'Email Bounce', 0.30)
+    
+    # 0b. Skip forwarded emails from own address (amount from old content)
+    subject = desc_lower
+    if re.match(r'^(fw:|fwd:|re:)', subject) and from_lower and '@' in from_lower:
+        domain = from_lower.split('@')[1] if '@' in from_lower else ''
+        # If the sender is gmail.com or the account's own domain, it's forwarded
+        if 'gmail.com' in domain:
+            return ('unknown', 'expense', 'Forwarded Email', 0.30)
     
     # 0. Check if it's a Google Play purchase (PayPal processor for Google)
     gp_result = extract_google_play_merchant(name_lower)
@@ -415,9 +468,23 @@ def parse_paypal_email(subject: str, body: str) -> Optional[Dict]:
     """Parse PayPal receipt emails to extract transaction data."""
     text = f"{subject} {body}"
     
+    # ── Skip non-transaction PayPal emails ──
+    # "Your transfer was successful" = money moving between own accounts
+    if re.search(r'(transfer was successful|transferring money to your bank|transfer to your bank|transferring.*bank|transfer.*successful)', text, re.I):
+        return None
+    # PayPal case closures / disputes
+    if re.search(r'(paypal case|case is now closed|dispute)', text, re.I):
+        return None
+    # "Insufficient funds" notifications
+    if re.search(r'(insufficient funds|failed payment|payment failed)', text, re.I):
+        return None
+    # PayPal promotional/marketing
+    if re.search(r'(reward|offer|cash back|cashback|earn)', text, re.I) and not re.search(r'payment|receipt|invoice', text, re.I):
+        return None
+    
     # Detect direction: payment sent (expense) or received (income)
     is_sent = bool(re.search(r'(payment to|you sent|you paid|receipt for your payment)', text, re.I))
-    is_received = bool(re.search(r'(payment received|you received|money received|received a payment)', text, re.I))
+    is_received = bool(re.search(r'(payment received|you received|money received|received a payment|sent you|got money)', text, re.I))
     tx_type = 'expense' if is_sent else ('income' if is_received else 'unknown')
     
     # Extract merchant name
