@@ -36,6 +36,10 @@ MERCHANT_CATEGORIES = {
     'samsung': ('personal', 'expense', 'Marketing'),
     'skrill': ('personal', 'expense', 'Shopping'),
 
+    # === PERSONAL: Dining Out / Food ===
+    'uber eats': ('personal', 'expense', 'Dining Out'),
+    'ubereats': ('personal', 'expense', 'Dining Out'),
+
     # === BUSINESS: Software & Subscriptions ===
     'slack': ('business', 'expense', 'Software & Subscriptions'),
     'github': ('business', 'expense', 'Software & Subscriptions'),
@@ -184,7 +188,10 @@ SENDER_CLASSIFICATION = {
     'payments-noreply@google.com': ('personal', 'expense', 'Entertainment', 0.8),
     'workspace-noreply@google.com': ('business', 'expense', 'Software & Subscriptions', 0.9),
     'noreply@uber.com': ('personal', 'expense', 'Transport', 0.95),
+    'uber.canada@uber.com': ('personal', 'expense', 'Transport', 0.95),
+    'uber@uber.com': ('personal', 'expense', 'Transport', 0.95),
     'uberone@uber.com': ('personal', 'expense', 'Transport', 0.95),
+    'ubereats@uber.com': ('personal', 'expense', 'Dining Out', 0.95),
     'no-reply@doordash.com': ('personal', 'expense', 'Dining Out', 0.95),
     'no-reply@messages.doordash.com': ('personal', 'expense', 'Dining Out', 0.95),
     'receipts@openrouter.ai': ('business', 'expense', 'Software & Subscriptions', 0.95),
@@ -350,9 +357,12 @@ def classify_merchant(name: str, description: str = "", amount: float = 0.0, fro
     subject = desc_lower
     if re.match(r'^(fw:|fwd:|re:)', subject) and from_lower and '@' in from_lower:
         domain = from_lower.split('@')[1] if '@' in from_lower else ''
-        # If the sender is gmail.com or the account's own domain, it's forwarded
         if 'gmail.com' in domain:
             return ('unknown', 'expense', 'Forwarded Email', 0.30)
+    
+    # 0c. Check for Uber Eats in the subject (even if PayPal passes merchant as "Uber")
+    if 'uber eats' in desc_lower or 'order with uber eats' in desc_lower:
+        return ('personal', 'expense', 'Dining Out', 0.90)
     
     # 0. Check if it's a Google Play purchase (PayPal processor for Google)
     gp_result = extract_google_play_merchant(name_lower)
