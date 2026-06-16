@@ -12,9 +12,10 @@ import glob
 import os
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Optional
 
-from .config import DB_DIR
+from .config import DB_DIR, START_YEAR
 
 # Columns the review UI is allowed to edit.
 EDITABLE_FIELDS = {
@@ -62,7 +63,11 @@ def _has_transactions_table(conn: sqlite3.Connection) -> bool:
 
 
 def available_years() -> list[int]:
-    years: set[int] = set()
+    """Every tax year from START_YEAR to the current year, plus any years that
+    actually have data (in case the ledger contains older or future emails).
+    This guarantees all tax years from 2006 onward are always selectable."""
+    current = datetime.now().year
+    years: set[int] = set(range(START_YEAR, current + 1))
     for path in _db_files():
         with _connect(path) as conn:
             if not _has_transactions_table(conn):

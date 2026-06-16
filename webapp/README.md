@@ -24,8 +24,18 @@ categorization, and the SQLite ledgers (`db/database.py`) and adds a UI + API.
     map to T2125 Part 4 line numbers, meals at the 50% limit.
   - **US Schedule C** (USD) — for US-sourced business activity.
   - **GST/HST** — taxable sales and eligible-expense bases (CAD).
-- **Scans** — trigger the Gmail scan pipeline from the UI and watch progress;
-  see scan history.
+- **Scans** — two buttons: **Scan recent** (fast, last few days) and
+  **Full history (2006→now)** which backfills every financial email back to
+  2006. Run the full scan once, then use "Scan recent" day to day. Watch
+  progress and see scan history.
+
+### Tax years
+
+Every tax year from **2006 to the current year** is always selectable in the
+dashboard and tax dropdowns, even before a year has data. Each transaction is
+filed under its own email date, so reports for any historical year are correct
+once the full-history scan has run. Change the earliest year with
+`EMAIL_ACCOUNTANT_START_YEAR`.
 
 ### Currency
 
@@ -74,7 +84,9 @@ All via environment variables (see `backend/env.sample`):
 | Var | Default | Purpose |
 |---|---|---|
 | `EMAIL_ACCOUNTANT_DB_DIR` | `~/.email-accountant/data` | Where the SQLite ledgers live |
-| `EMAIL_ACCOUNTANT_SCAN_CMD` | `python scan_daily.py` | What "Scan now" runs |
+| `EMAIL_ACCOUNTANT_START_YEAR` | `2006` | Earliest selectable tax year |
+| `EMAIL_ACCOUNTANT_SCAN_CMD` | `python scan_daily.py` | "Scan recent" command |
+| `EMAIL_ACCOUNTANT_FULL_SCAN_CMD` | `python scan_full_archive_fast.py` | "Full history" command |
 | `EMAIL_ACCOUNTANT_FRONTEND_ORIGIN` | `http://localhost:3000` | CORS origin |
 | `NEXT_PUBLIC_API_BASE` | `http://localhost:8000` | Where the UI finds the API |
 

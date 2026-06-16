@@ -136,8 +136,10 @@ export const api = {
     if (!res.ok) throw new Error(`update failed: ${res.status}`);
     return res.json() as Promise<Transaction>;
   },
-  async startScan() {
-    const res = await fetch(`${API_BASE}/api/scans`, { method: "POST" });
+  async startScan(mode: "incremental" | "full" = "incremental") {
+    const res = await fetch(`${API_BASE}/api/scans?mode=${mode}`, {
+      method: "POST",
+    });
     return res.json();
   },
 };

@@ -123,8 +123,9 @@ def scan_runs() -> dict[str, Any]:
 
 
 @app.post("/api/scans")
-def trigger_scan() -> dict[str, Any]:
-    return scans.start_scan()
+def trigger_scan(mode: str = "incremental") -> dict[str, Any]:
+    """mode=incremental (recent) or mode=full (history back to START_YEAR)."""
+    return scans.start_scan(mode=mode)
 
 
 @app.get("/api/scans/{job_id}")

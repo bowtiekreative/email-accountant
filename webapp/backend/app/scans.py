@@ -12,10 +12,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from .config import SCAN_COMMAND
+from .config import FULL_SCAN_COMMAND, SCAN_COMMAND
 
 _jobs: dict[str, dict[str, Any]] = {}
 _lock = threading.Lock()
+
+# Full-history backfills can take a long time; give them a generous ceiling.
+_TIMEOUTS = {"incremental": 60 * 30, "full": 60 * 60 * 6}
 
 
 def _now() -> str:
@@ -26,10 +29,10 @@ def _run(job_id: str) -> None:
     job = _jobs[job_id]
     try:
         proc = subprocess.run(
-            shlex.split(SCAN_COMMAND),
+            shlex.split(job["command"]),
             capture_output=True,
             text=True,
-            timeout=60 * 30,
+            timeout=_TIMEOUTS.get(job["mode"], 60 * 30),
         )
         tail = (proc.stdout or "")[-8000:]
         err = (proc.stderr or "")[-4000:]
@@ -42,7 +45,7 @@ def _run(job_id: str) -> None:
     except subprocess.TimeoutExpired:
         with _lock:
             job["status"] = "failed"
-            job["error"] = "Scan timed out after 30 minutes"
+            job["error"] = "Scan timed out"
             job["finished_at"] = _now()
     except Exception as exc:  # noqa: BLE001 - surface any launch failure to the UI
         with _lock:
@@ -51,7 +54,10 @@ def _run(job_id: str) -> None:
             job["finished_at"] = _now()
 
 
-def start_scan() -> dict[str, Any]:
+def start_scan(mode: str = "incremental") -> dict[str, Any]:
+    if mode not in ("incremental", "full"):
+        mode = "incremental"
+
     # Refuse to launch a second scan while one is running.
     with _lock:
         for job in _jobs.values():
@@ -62,7 +68,8 @@ def start_scan() -> dict[str, Any]:
     job = {
         "id": job_id,
         "status": "running",
-        "command": SCAN_COMMAND,
+        "mode": mode,
+        "command": FULL_SCAN_COMMAND if mode == "full" else SCAN_COMMAND,
         "started_at": _now(),
         "finished_at": None,
         "output": "",
