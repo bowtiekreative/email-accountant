@@ -126,6 +126,14 @@ MERCHANT_CATEGORIES = {
     'ko-fi': ('business', 'income', 'Client Payments'),
     'koho': ('personal', 'income', 'Miscellaneous Income'),  # Tax refund/cashback
 
+    # === BUSINESS: Public Speaking ===
+    'speaking': ('business', 'income', 'Public Speaking'),
+    'keynote': ('business', 'income', 'Public Speaking'),
+    'honorarium': ('business', 'income', 'Public Speaking'),
+    'speaker': ('business', 'income', 'Public Speaking'),
+    'speakers bureau': ('business', 'income', 'Public Speaking'),
+    'talk': ('business', 'income', 'Public Speaking'),
+
     # === PERSONAL: Entertainment (dating apps, streaming) ===
     'grindr': ('personal', 'expense', 'Entertainment'),
     'tinder': ('personal', 'expense', 'Entertainment'),
@@ -447,6 +455,10 @@ def classify_merchant(name: str, description: str = "", amount: float = 0.0, fro
         'server': ('business', 'expense', 'Internet & Telecom'),
         'license': ('business', 'expense', 'Software & Subscriptions'),
         'api': ('business', 'expense', 'Software & Subscriptions'),
+        'speaking fee': ('business', 'income', 'Public Speaking'),
+        'speaking engagement': ('business', 'income', 'Public Speaking'),
+        'honorarium': ('business', 'income', 'Public Speaking'),
+        'keynote': ('business', 'income', 'Public Speaking'),
         'app for': ('business', 'expense', 'Software & Subscriptions'),
     }
     personal_keywords = {
