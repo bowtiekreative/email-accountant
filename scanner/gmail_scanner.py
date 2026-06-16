@@ -19,7 +19,7 @@ from pathlib import Path
 # Config
 # ---------------------------------------------------------------------------
 
-GMAIL_USER = "ryan@bowtiekreative.com"
+GMAIL_USER = os.environ.get("GMAIL_USER", "ryan@bowtiekreative.com")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 if not GMAIL_APP_PASSWORD:
@@ -62,9 +62,9 @@ FINANCIAL_QUERIES = [
 class GmailScanner:
     """Scan Gmail via IMAP and store in the email-accountant database."""
     
-    def __init__(self, db=None):
-        self.user = GMAIL_USER
-        self.password = GMAIL_APP_PASSWORD
+    def __init__(self, db=None, user=None, password=None):
+        self.user = user or GMAIL_USER
+        self.password = password or GMAIL_APP_PASSWORD
         self.mail = None
         self.db = db  # EmailAccountantDB instance
         
@@ -310,12 +310,17 @@ class GmailScanner:
         
         return att_records
     
-    def process_email(self, raw_bytes):
-        """Parse an email, store in DB, and return results."""
+    def process_email(self, raw_bytes, account_id=None):
+        """Parse an email, store in DB, and return results.
+        If account_id is provided, tags the email with it."""
         parsed = self.parse_email(raw_bytes)
         attachments = parsed.pop("body_attachments", [])
         
         if self.db:
+            # Tag with account
+            if account_id:
+                parsed["account_id"] = account_id
+            
             # Insert email
             email_id = self.db.insert_email(parsed)
             
@@ -332,27 +337,34 @@ class GmailScanner:
         
         return None, parsed, []
     
-    def scan_and_store(self, days_back=None, folder='"INBOX"', 
-                       account_label="personal"):
-        """Full scan: fetch financial emails, parse, store in DB."""
+    def scan_and_store(self, days_back=None, folder='"[Gmail]/All Mail"', 
+                       account_label="personal", account_id=None):
+        """Full scan: fetch financial emails, parse, store in DB.
+        If account_id is provided, uses that. Otherwise looks up by label."""
         start_time = time.time()
         
-        # Ensure account exists
-        if self.db:
-            # Check if account exists
+        # Resolve account
+        if not account_id and self.db:
             conn = self.db._conn
             existing = conn.execute(
                 "SELECT id FROM email_accounts WHERE label = ?",
                 (account_label,)
             ).fetchone()
-            
-            if not existing:
+            if existing:
+                account_id = existing['id']
+            else:
                 conn.execute(
                     "INSERT INTO email_accounts (label, email_address, provider) VALUES (?, ?, 'gmail')",
-                    (account_label, GMAIL_USER)
+                    (account_label, self.user)
                 )
                 conn.commit()
-                print(f"  📋 Created account: {account_label} ({GMAIL_USER})")
+                account_id = conn.execute(
+                    "SELECT id FROM email_accounts WHERE email_address = ?",
+                    (self.user,)
+                ).fetchone()['id']
+                print(f"  📋 Created account: {account_label} ({self.user}) id={account_id}")
+        
+        print(f"  📋 Using account_id={account_id} for {self.user}")
         
         # Search
         raw_emails = self.search_financial(days_back, folder)
@@ -366,7 +378,7 @@ class GmailScanner:
         for i, raw in enumerate(raw_emails):
             print(f"  📨 Processing {i+1}/{len(raw_emails)}...", end=" ", flush=True)
             try:
-                email_id, parsed, atts = self.process_email(raw)
+                email_id, parsed, atts = self.process_email(raw, account_id)
                 if email_id:
                     results.append({
                         "email_id": email_id,
