@@ -1,3 +1,10 @@
 __pycache__/
 .env
 .env.example
+.env.local
+
+# webapp
+node_modules/
+.next/
+.venv/
+*.tsbuildinfo
