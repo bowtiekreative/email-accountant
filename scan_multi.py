@@ -24,6 +24,7 @@ ACCOUNTS = [
     ('bowtiekreative', 'bowtiekreative@gmail.com', 'GMAIL_BOWTIEKREATIVE_PASSWORD'),
     ('k6rb1n', 'k6rb1n@gmail.com', 'GMAIL_K6RB1N_PASSWORD'),
     ('bnelsonblog1', 'bnelsonblog1@gmail.com', 'GMAIL_BNELSONBLOG1_PASSWORD'),
+    ('hustlezontv', 'hustlezontv@gmail.com', 'GMAIL_HUSTLEZONETV_PASSWORD'),
 ]
 SCAN_DAYS = 90
 
