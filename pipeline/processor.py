@@ -110,6 +110,13 @@ MERCHANT_CATEGORIES = {
     'costco': ('personal', 'expense', 'Shopping'),
     'amazon': ('personal', 'expense', 'Shopping'),
     'instacart': ('personal', 'expense', 'Groceries'),
+    'petsmart': ('personal', 'expense', 'Shopping'),
+    'petco': ('personal', 'expense', 'Shopping'),
+
+    # === BUSINESS: Software & Subscriptions (continued) ===
+    'lemonsqueezy': ('business', 'expense', 'Software & Subscriptions'),
+    'intelius': ('personal', 'expense', 'Entertainment'),
+    'spokeo': ('personal', 'expense', 'Entertainment'),
 
     # === PERSONAL: Software & Subscriptions ===
     'google play': ('personal', 'expense', 'Entertainment'),
@@ -201,6 +208,10 @@ SENDER_CLASSIFICATION = {
     'invoice+statements@mail.anthropic.com': ('business', 'expense', 'Software & Subscriptions', 0.95),
     'microsoft365@infomails.microsoft.com': ('business', 'expense', 'Software & Subscriptions', 0.90),
     'aryan.f@emergent.sh': ('business', 'expense', 'Professional Services', 0.70),
+    'hello@lemonsqueezy-mail.com': ('business', 'expense', 'Software & Subscriptions', 0.95),
+    'accounts@mg.mailer.intelius.com': ('personal', 'expense', 'Entertainment', 0.80),
+    'petsmart@emails.petsmart.com': ('personal', 'expense', 'Shopping', 0.95),
+    'noreply@mail4.spokeo.com': ('personal', 'expense', 'Entertainment', 0.85),
 }
 
 # Stripe sender patterns (these send payment receipts, invoices, failed payments)
