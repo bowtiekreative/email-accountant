@@ -6,7 +6,7 @@ from datetime import datetime
 # Get Gmail app password from Proton Pass
 os.environ['PATH'] = f"{os.path.expanduser('~/.local/bin')}:{os.environ.get('PATH', '')}"
 os.environ['PROTON_PASS_KEY_PROVIDER'] = 'fs'
-os.environ['PROTON_PASS_SESSION_DIR'] = '/tmp/pass-agent-hermes'
+os.environ['PROTON_PASS_SESSION_DIR'] = os.path.join(os.path.expanduser('~'), '.email-accountant', 'pass-session')
 
 result = subprocess.run(
     ['pass-cli', 'item', 'view', '--vault-name', 'Messaging',

@@ -110,17 +110,25 @@ class GmailScanner:
         
         return results
     
-    def search_financial(self, days_back=30, folder='"[Gmail]/All Mail"'):
+    def search_financial(self, days_back=None, folder='"[Gmail]/All Mail"'):
         """Search for all financial emails using multiple query patterns.
-        Gmail stores everything in All Mail — use that for comprehensive scanning."""
-        date_since = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
+        Gmail stores everything in All Mail — use that for comprehensive scanning.
+        When days_back=None, scans ALL mail (no date filter)."""
         all_results = []
         seen_ids = set()
         
-        print(f"\n🔍 Scanning last {days_back} days...")
+        if days_back:
+            date_since = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
+            print(f"\n🔍 Scanning last {days_back} days...")
+        else:
+            date_since = None
+            print(f"\n🔍 Scanning ALL mail (full archive)...")
         
         for label, query in FINANCIAL_QUERIES:
-            full_query = f'(SINCE {date_since}) {query}'
+            if date_since:
+                full_query = f'(SINCE {date_since}) {query}'
+            else:
+                full_query = query
             results = self.search_emails(folder, full_query)
             
             for mid, raw in results:
@@ -324,7 +332,7 @@ class GmailScanner:
         
         return None, parsed, []
     
-    def scan_and_store(self, days_back=30, folder='"INBOX"', 
+    def scan_and_store(self, days_back=None, folder='"INBOX"', 
                        account_label="personal"):
         """Full scan: fetch financial emails, parse, store in DB."""
         start_time = time.time()

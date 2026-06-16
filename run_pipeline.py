@@ -112,7 +112,7 @@ def process_email(db, email_id: int):
     # Step 4: Classify transaction
     if amount:
         domain, tx_type_class, category, class_conf = classify_merchant(
-            merchant or from_email, subject or '', amount
+            merchant or from_email, subject or '', amount, from_email
         )
         if tx_type == 'unknown':
             tx_type = tx_type_class
