@@ -22,10 +22,13 @@ c = db._conn
 
 def extract_invoice_number(text):
     """Extract invoice/order/receipt number from text."""
-    m = re.search(r'(?:[Ii]nvoice|#[Ii]nvoice)\s*#?\s*(\d{4,})', text)
+    m = re.search(r'(?:[Ii]nvoice|#[Ii]nvoice)\s*#?\s*(\d{1,})', text)
     if m:
         return m.group(1)
-    m = re.search(r'(?:Order|Receipt)\s*#?\s*(\d{5,})', text)
+    m = re.search(r'(?:Payment|Order|Receipt)\s*(?:Receipt|Confirmation)?\s*(?:for|#)?\s*(?:Invoice|Order)?\s*#?\s*(\d{1,})', text, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    m = re.search(r'\b(?:Order|Receipt)\s*#\s*(\d{3,})', text)
     if m:
         return m.group(1)
     return None

@@ -24,10 +24,16 @@ print("=" * 70)
 def extract_invoice_number(subject, description, from_email):
     """Try to extract an invoice number from the data available."""
     text = f"{subject or ''} {description or ''} {from_email or ''}"
-    m = re.search(r'(?:[Ii]nvoice|#[Ii]nvoice)\s*#?\s*(\d{4,})', text)
+    # Try specific patterns: Invoice #N, Order #N, Receipt #N
+    m = re.search(r'(?:[Ii]nvoice|#[Ii]nvoice)\s*#?\s*(\d{1,})', text)
     if m:
         return m.group(1)
-    m = re.search(r'(?:Order|Receipt)\s*#?\s*(\d{5,})', text)
+    # "Payment Receipt for Invoice #N"
+    m = re.search(r'(?:Payment|Order|Receipt)\s*(?:Receipt|Confirmation)?\s*(?:for|#)?\s*(?:Invoice|Order)?\s*#?\s*(\d{1,})', text, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    # Generic "Order #12345" / "Receipt #123"
+    m = re.search(r'\b(?:Order|Receipt)\s*#\s*(\d{3,})', text)
     if m:
         return m.group(1)
     return ''
