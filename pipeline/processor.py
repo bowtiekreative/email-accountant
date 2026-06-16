@@ -117,6 +117,9 @@ MERCHANT_CATEGORIES = {
     'lemonsqueezy': ('business', 'expense', 'Software & Subscriptions'),
     'intelius': ('personal', 'expense', 'Entertainment'),
     'spokeo': ('personal', 'expense', 'Entertainment'),
+    'texture': ('personal', 'expense', 'Entertainment'),
+    'ancestry': ('personal', 'expense', 'Entertainment'),
+    'udemy': ('business', 'expense', 'Software & Subscriptions'),
 
     # === PERSONAL: Software & Subscriptions ===
     'google play': ('personal', 'expense', 'Entertainment'),
@@ -212,6 +215,9 @@ SENDER_CLASSIFICATION = {
     'accounts@mg.mailer.intelius.com': ('personal', 'expense', 'Entertainment', 0.80),
     'petsmart@emails.petsmart.com': ('personal', 'expense', 'Shopping', 0.95),
     'noreply@mail4.spokeo.com': ('personal', 'expense', 'Entertainment', 0.85),
+    'email@email.texture.ca': ('personal', 'expense', 'Entertainment', 0.85),
+    'ancestry@email.ancestry.ca': ('personal', 'expense', 'Entertainment', 0.85),
+    'udemy@email.udemy.com': ('business', 'expense', 'Software & Subscriptions', 0.85),
 }
 
 # Stripe sender patterns (these send payment receipts, invoices, failed payments)
