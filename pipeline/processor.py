@@ -120,6 +120,7 @@ MERCHANT_CATEGORIES = {
     'texture': ('personal', 'expense', 'Entertainment'),
     'ancestry': ('personal', 'expense', 'Entertainment'),
     'udemy': ('business', 'expense', 'Software & Subscriptions'),
+    'descript': ('business', 'expense', 'Software & Subscriptions'),
 
     # === PERSONAL: Software & Subscriptions ===
     'google play': ('personal', 'expense', 'Entertainment'),
@@ -218,6 +219,7 @@ SENDER_CLASSIFICATION = {
     'email@email.texture.ca': ('personal', 'expense', 'Entertainment', 0.85),
     'ancestry@email.ancestry.ca': ('personal', 'expense', 'Entertainment', 0.85),
     'udemy@email.udemy.com': ('business', 'expense', 'Software & Subscriptions', 0.85),
+    'paypal@emails.paypal.com': ('personal', 'expense', 'Shopping', 0.50),  # Promotional/rewards emails
 }
 
 # Stripe sender patterns (these send payment receipts, invoices, failed payments)
