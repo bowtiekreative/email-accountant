@@ -279,6 +279,7 @@ def scan_account(label, email_addr, env_key):
                             'email_date': str(parsed.get('email_date', '') or '')[:25],
                             'merchant_name': merchant[:100],
                             'amount': amt,
+                            'currency': financial.get('currency', 'USD'),
                             'description': str(parsed.get('subject', '') or '')[:200],
                             'domain': domain,
                             'transaction_type': tx_type,

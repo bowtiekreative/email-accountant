@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import ledger, scans
+from . import ledger, planning, reminders, scans
 from .config import FRONTEND_ORIGIN
 
 app = FastAPI(title="Email Accountant API", version="1.0.0")
@@ -134,3 +134,82 @@ def scan_status(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+# ---------------------------------------------------------------------------
+# Planning suite: subscriptions, budgets, recommendations, yearly plan
+# ---------------------------------------------------------------------------
+
+@app.get("/api/subscriptions")
+def subscriptions(currency: Optional[str] = None) -> dict[str, Any]:
+    return planning.subscriptions(currency=currency)
+
+
+@app.get("/api/budgets")
+def budgets() -> list[dict[str, Any]]:
+    return planning.list_budgets()
+
+
+class BudgetIn(BaseModel):
+    category: str
+    monthly_limit: float
+    currency: str = "USD"
+    domain: Optional[str] = None
+
+
+@app.post("/api/budgets")
+def set_budget(payload: BudgetIn) -> dict[str, Any]:
+    return planning.set_budget(
+        payload.category, payload.monthly_limit, payload.currency, payload.domain
+    )
+
+
+@app.delete("/api/budgets")
+def delete_budget(category: str, currency: str = "USD") -> dict[str, Any]:
+    planning.delete_budget(category, currency)
+    return {"deleted": category, "currency": currency}
+
+
+@app.get("/api/budgets/recommendations")
+def budget_recommendations(currency: str = "USD") -> dict[str, Any]:
+    return planning.budget_recommendations(currency=currency)
+
+
+@app.post("/api/budgets/apply-recommendations")
+def apply_recommendations(currency: str = "USD") -> dict[str, Any]:
+    return planning.apply_recommended_budgets(currency=currency)
+
+
+@app.get("/api/plan")
+def yearly_plan(year: int, currency: str = "USD") -> dict[str, Any]:
+    return planning.yearly_plan(year, currency=currency)
+
+
+# ---------------------------------------------------------------------------
+# Reminders
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reminders")
+def list_reminders(currency: Optional[str] = None) -> list[dict[str, Any]]:
+    return reminders.build_reminders(currency=currency)
+
+
+@app.post("/api/reminders/send")
+def send_reminders(currency: Optional[str] = None) -> dict[str, Any]:
+    return reminders.send_reminders(currency=currency)
+
+
+# ---------------------------------------------------------------------------
+# Backup
+# ---------------------------------------------------------------------------
+
+@app.post("/api/backup")
+def backup() -> dict[str, Any]:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from scripts.backup_ledgers import backup as run_backup
+
+    dest = run_backup()
+    return {"backed_up_to": str(dest), "files": len(list(dest.glob("*.db")))}

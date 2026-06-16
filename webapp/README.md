@@ -24,6 +24,15 @@ categorization, and the SQLite ledgers (`db/database.py`) and adds a UI + API.
     map to T2125 Part 4 line numbers, meals at the 50% limit.
   - **US Schedule C** (USD) — for US-sourced business activity.
   - **GST/HST** — taxable sales and eligible-expense bases (CAD).
+- **Planning** — one page, four tabs:
+  - **Yearly Plan** — projects the year's income/expense/net from data so far,
+    and shows spending vs budget per category.
+  - **Budgets** — recommends a monthly budget per category from your last 12
+    months; apply individually or all at once.
+  - **Subscriptions** — auto-detects recurring charges, their cadence, monthly
+    cost, and active/inactive status, with a per-currency monthly burn rate.
+  - **Reminders** — budget overruns, upcoming renewals, review backlog, and the
+    CRA filing deadline. A daily email digest is available via cron.
 - **Scans** — two buttons: **Scan recent** (fast, last few days) and
   **Full history (2006→now)** which backfills every financial email back to
   2006. Run the full scan once, then use "Scan recent" day to day. Watch
@@ -36,6 +45,26 @@ dashboard and tax dropdowns, even before a year has data. Each transaction is
 filed under its own email date, so reports for any historical year are correct
 once the full-history scan has run. Change the earliest year with
 `EMAIL_ACCOUNTANT_START_YEAR`.
+
+### Email reminders, backups & tests
+
+```bash
+# Email the reminders digest (set SMTP_* or GMAIL_* + REMINDER_TO first).
+# Add to cron for a daily nudge:  0 8 * * *  cd /path/to/repo && python reminders_cron.py
+python reminders_cron.py
+
+# Back up every ledger to ~/.email-accountant/backups/<timestamp>/
+python scripts/backup_ledgers.py
+
+# Run the test suite (currency, classifier, ledger reports, planning)
+pip install pytest && python -m pytest
+```
+
+### Currency detection
+
+Currency is detected per email (explicit CAD/USD tokens → `.ca` sender →
+known Canadian merchant → default USD), so CAD and USD transactions are
+labelled correctly as they're scanned.
 
 ### Currency
 
@@ -134,6 +163,13 @@ The data layer already supports Supabase/Postgres. Set `EMAIL_ACCOUNTANT_DB=supa
 | GET | `/api/reports/schedule-c?year=&currency=USD` | US Schedule C |
 | GET | `/api/reports/gst-hst?year=&currency=CAD` | GST/HST summary |
 | GET/POST | `/api/scans` | History / trigger a scan |
+| GET | `/api/subscriptions?currency=` | Detected recurring charges |
+| GET/POST/DELETE | `/api/budgets` | List / set / remove budgets |
+| GET | `/api/budgets/recommendations?currency=` | Suggested budgets |
+| POST | `/api/budgets/apply-recommendations?currency=` | Apply all suggestions |
+| GET | `/api/plan?year=&currency=` | Yearly projection |
+| GET/POST | `/api/reminders` | Preview / email the digest |
+| POST | `/api/backup` | Back up all ledgers |
 
 Transaction IDs are `"<ledger-file>:<rowid>"` so edits route to the correct
 year-partitioned database.

@@ -95,6 +95,65 @@ export type GstHst = {
   note: string;
 };
 
+export type Subscription = {
+  merchant: string;
+  currency: string;
+  category?: string;
+  domain?: string;
+  frequency: string;
+  typical_amount: number;
+  monthly_cost: number;
+  annual_cost: number;
+  charges: number;
+  last_charge: string;
+  active: boolean;
+};
+
+export type SubscriptionsResponse = {
+  subscriptions: Subscription[];
+  monthly_burn_by_currency: Record<string, number>;
+  active_count: number;
+};
+
+export type Budget = {
+  category: string;
+  monthly_limit: number;
+  annual_limit?: number;
+  currency: string;
+  domain?: string;
+};
+
+export type Recommendation = {
+  category: string;
+  currency: string;
+  avg_monthly: number;
+  peak_monthly: number;
+  recommended_monthly: number;
+  current_budget: number | null;
+  status: string;
+};
+
+export type YearlyPlan = {
+  year: number;
+  currency: string;
+  months_elapsed: number;
+  actual_income: number;
+  actual_expense: number;
+  actual_net: number;
+  projected_income: number;
+  projected_expense: number;
+  projected_net: number;
+  budgeted_annual_expense: number;
+  categories: { category: string; spent: number; annual_budget: number | null; over: boolean }[];
+};
+
+export type Reminder = {
+  type: string;
+  severity: "high" | "medium" | "low";
+  currency: string | null;
+  message: string;
+};
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${res.status} ${path}`);
@@ -135,6 +194,38 @@ export const api = {
     });
     if (!res.ok) throw new Error(`update failed: ${res.status}`);
     return res.json() as Promise<Transaction>;
+  },
+  subscriptions: (currency?: string) =>
+    get<SubscriptionsResponse>(
+      `/api/subscriptions${currency ? `?currency=${currency}` : ""}`
+    ),
+  budgets: () => get<Budget[]>("/api/budgets"),
+  recommendations: (currency = "USD") =>
+    get<{ currency: string; recommendations: Recommendation[] }>(
+      `/api/budgets/recommendations?currency=${currency}`
+    ),
+  plan: (year: number, currency = "USD") =>
+    get<YearlyPlan>(`/api/plan?year=${year}&currency=${currency}`),
+  reminders: (currency?: string) =>
+    get<Reminder[]>(`/api/reminders${currency ? `?currency=${currency}` : ""}`),
+  async setBudget(category: string, monthly_limit: number, currency: string) {
+    const res = await fetch(`${API_BASE}/api/budgets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, monthly_limit, currency }),
+    });
+    return res.json();
+  },
+  async applyRecommendations(currency = "USD") {
+    const res = await fetch(
+      `${API_BASE}/api/budgets/apply-recommendations?currency=${currency}`,
+      { method: "POST" }
+    );
+    return res.json();
+  },
+  async backup() {
+    const res = await fetch(`${API_BASE}/api/backup`, { method: "POST" });
+    return res.json();
   },
   async startScan(mode: "incremental" | "full" = "incremental") {
     const res = await fetch(`${API_BASE}/api/scans?mode=${mode}`, {

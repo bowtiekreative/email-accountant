@@ -601,6 +601,49 @@ AMOUNT_PATTERNS = [
 ]
 
 
+# ===========================================================================
+# CURRENCY DETECTION (CAD vs USD)
+# ===========================================================================
+
+# Merchants / sender hints that strongly imply Canadian-dollar billing.
+_CAD_HINTS = (
+    'rogers', 'bell canada', 'telus', 'fido', 'koodo', 'shaw', 'videotron',
+    'loblaws', 'sobeys', 'no frills', 'superstore', 'canadian tire', 'rona',
+    'shoppers drug mart', 'tim hortons', 'petro-canada', 'petro canada', 'esso',
+    'air canada', 'westjet', 'via rail', 'presto', 'translink', 'go transit',
+    'enbridge', 'hydro', 'koho', 'oxio', 'moneymart', 'interac', 'gst', 'hst',
+)
+
+
+def detect_currency(text: str, from_email: str = "", merchant: str = "") -> str:
+    """Best-effort CAD vs USD detection from email text / sender / merchant.
+
+    Order of precedence:
+      1. Explicit currency tokens (CAD / C$ / CA$ vs USD / US$).
+      2. Canadian sender domain (.ca) or known Canadian merchant.
+      3. Default to USD (most receipts here are US-billed).
+    """
+    blob = f"{text or ''} {merchant or ''}".lower()
+    frm = (from_email or "").lower()
+
+    # 1. Explicit currency markers.
+    if re.search(r'\b(cad|cdn)\b|ca\$|c\$|\$\s?cad', blob):
+        return "CAD"
+    if re.search(r'\b(usd)\b|us\$|\$\s?usd', blob):
+        return "USD"
+
+    # 2. Canadian sender or merchant hints.
+    if frm.endswith('.ca') or '.ca/' in frm or frm.endswith('.ca>'):
+        return "CAD"
+    if any(h in blob for h in _CAD_HINTS):
+        return "CAD"
+    if any(h in frm for h in _CAD_HINTS):
+        return "CAD"
+
+    # 3. Default.
+    return "USD"
+
+
 def extract_amount_from_text(text: str) -> Optional[float]:
     """Extract dollar amount from text."""
     if not text:
@@ -1011,6 +1054,10 @@ def parse_email_financial(email_record: dict) -> Optional[Dict]:
         if sender_pattern in from_email and parser_func:
             result = parser_func(subject, body)
             if result:
+                result.setdefault(
+                    'currency',
+                    detect_currency(f"{subject} {body}", from_email, result.get('merchant', '')),
+                )
                 return result
     
     # Generic: extract amount and guess merchant
@@ -1031,8 +1078,9 @@ def parse_email_financial(email_record: dict) -> Optional[Dict]:
             'amount': amount,
             'transaction_type': 'expense',
             'source': 'generic_email',
+            'currency': detect_currency(text, from_email, merchant or ''),
         }
-    
+
     return None
 
 
@@ -1234,6 +1282,10 @@ def process_email(db, email_id: int):
             else:
                 deduction_rate = 1.0
         
+        currency = (financial or {}).get('currency') or detect_currency(
+            f"{subject} {body_text}", from_email, merchant or ''
+        )
+
         tx_data = {
             'email_id': email_id,
             'email_from': from_email,
@@ -1242,6 +1294,7 @@ def process_email(db, email_id: int):
             'merchant_name': merchant[:100] if merchant else from_email[:100],
             'merchant_email': from_email,
             'amount': round(amount, 2),
+            'currency': currency,
             'transaction_date': txn_date,
             'description': subject[:500] if subject else None,
             'domain': domain,
