@@ -298,28 +298,122 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_logs_email ON pipeline_logs(email_id);
 
 # Seed data
 SEED_SQL = """
--- Categories
+-- Categories — comprehensive taxonomy (income/expense, personal/business)
 INSERT OR IGNORE INTO categories (name, domain, tx_type, tax_relevant, irs_line, sort_order) VALUES
+    -- ── Business income ──
     ('Client Payments', 'business', 'income', 1, 'Line 1', 1),
     ('Product/Service Sales', 'business', 'income', 1, 'Line 1', 2),
     ('Consulting Fees', 'business', 'income', 1, 'Line 1', 3),
     ('Affiliate Income', 'business', 'income', 1, 'Line 1', 4),
-    ('Software & Subscriptions', 'business', 'expense', 1, 'Line 18', 10),
-    ('Marketing & Advertising', 'business', 'expense', 1, 'Line 8', 11),
-    ('Internet & Telecom', 'business', 'expense', 1, 'Line 25', 12),
-    ('Office Supplies', 'business', 'expense', 1, 'Line 18', 13),
-    ('Travel & Meals', 'business', 'expense', 1, 'Line 24', 14),
-    ('Professional Services', 'business', 'expense', 1, 'Line 17', 15),
-    ('Equipment & Hardware', 'business', 'expense', 1, 'Line 13', 16),
-    ('Housing & Rent', 'personal', 'expense', 0, NULL, 20),
-    ('Groceries', 'personal', 'expense', 0, NULL, 21),
-    ('Entertainment', 'personal', 'expense', 0, NULL, 22),
-    ('Dining Out', 'personal', 'expense', 0, NULL, 23),
-    ('Healthcare', 'personal', 'expense', 0, NULL, 24),
-    ('Personal Transport', 'personal', 'expense', 0, NULL, 25),
-    ('Shopping', 'personal', 'expense', 0, NULL, 26),
+    ('Royalties & Licensing', 'business', 'income', 1, 'Line 1', 5),
+    ('Advertising & Sponsorship Income', 'business', 'income', 1, 'Line 1', 6),
+    ('Commission Income', 'business', 'income', 1, 'Line 1', 7),
+    ('Public Speaking', 'business', 'income', 1, 'Line 1', 8),
+    ('Course & Digital Product Sales', 'business', 'income', 1, 'Line 1', 9),
+    ('Grants & Subsidies', 'business', 'income', 1, 'Line 6', 10),
+    ('Business Interest Income', 'business', 'income', 1, 'Line 6', 11),
+    ('Other Business Income', 'business', 'income', 1, 'Line 6', 12),
+    -- ── Personal income ──
     ('Employment Salary', 'personal', 'income', 0, NULL, 30),
-    ('Investment Income', 'personal', 'income', 0, NULL, 31);
+    ('Self-Employment Draw', 'personal', 'income', 0, NULL, 31),
+    ('Investment Income', 'personal', 'income', 0, NULL, 32),
+    ('Dividend Income', 'personal', 'income', 0, NULL, 33),
+    ('Interest Income', 'personal', 'income', 0, NULL, 34),
+    ('Capital Gains', 'personal', 'income', 0, NULL, 35),
+    ('Rental Income', 'personal', 'income', 0, NULL, 36),
+    ('Pension & Retirement', 'personal', 'income', 0, NULL, 37),
+    ('Government Benefits', 'personal', 'income', 0, NULL, 38),
+    ('Tax Refund', 'personal', 'income', 0, NULL, 39),
+    ('Gifts Received', 'personal', 'income', 0, NULL, 40),
+    ('Reimbursements', 'personal', 'income', 0, NULL, 41),
+    ('Other Personal Income', 'personal', 'income', 0, NULL, 42),
+    -- ── Business expenses ──
+    ('Software & Subscriptions', 'business', 'expense', 1, 'Line 18', 50),
+    ('Web Hosting & Domains', 'business', 'expense', 1, 'Line 27a', 51),
+    ('Marketing & Advertising', 'business', 'expense', 1, 'Line 8', 52),
+    ('Online Ads', 'business', 'expense', 1, 'Line 8', 53),
+    ('Internet & Telecom', 'business', 'expense', 1, 'Line 25', 54),
+    ('Office Supplies', 'business', 'expense', 1, 'Line 18', 55),
+    ('Materials & Supplies', 'business', 'expense', 1, 'Line 22', 56),
+    ('Office Rent', 'business', 'expense', 1, 'Line 20b', 57),
+    ('Home Office', 'business', 'expense', 1, 'Line 30', 58),
+    ('Business Travel', 'business', 'expense', 1, 'Line 24a', 59),
+    ('Meals & Entertainment', 'business', 'expense', 1, 'Line 24b', 60),
+    ('Travel & Meals', 'business', 'expense', 1, 'Line 24', 61),
+    ('Vehicle & Auto', 'business', 'expense', 1, 'Line 9', 62),
+    ('Fuel & Gas (Business)', 'business', 'expense', 1, 'Line 9', 63),
+    ('Professional Services', 'business', 'expense', 1, 'Line 17', 64),
+    ('Contractors & Freelancers', 'business', 'expense', 1, 'Line 11', 65),
+    ('Wages & Payroll', 'business', 'expense', 1, 'Line 26', 66),
+    ('Employee Benefits', 'business', 'expense', 1, 'Line 14', 67),
+    ('Business Insurance', 'business', 'expense', 1, 'Line 15', 68),
+    ('Interest & Bank Fees', 'business', 'expense', 1, 'Line 16b', 69),
+    ('Merchant & Processing Fees', 'business', 'expense', 1, 'Line 27a', 70),
+    ('Equipment & Hardware', 'business', 'expense', 1, 'Line 13', 71),
+    ('Depreciation', 'business', 'expense', 1, 'Line 13', 72),
+    ('Repairs & Maintenance', 'business', 'expense', 1, 'Line 21', 73),
+    ('Utilities (Business)', 'business', 'expense', 1, 'Line 25', 74),
+    ('Licenses & Permits', 'business', 'expense', 1, 'Line 23', 75),
+    ('Dues & Memberships', 'business', 'expense', 1, 'Line 27a', 76),
+    ('Education & Training', 'business', 'expense', 1, 'Line 27a', 77),
+    ('Shipping & Postage', 'business', 'expense', 1, 'Line 27a', 78),
+    ('Inventory & COGS', 'business', 'expense', 1, 'Line 4', 79),
+    ('Taxes & Fees (Business)', 'business', 'expense', 1, 'Line 23', 80),
+    ('Charitable Sponsorship', 'business', 'expense', 1, 'Line 27a', 81),
+    ('Other Business Expense', 'business', 'expense', 1, 'Line 27a', 82),
+    -- ── Personal expenses ──
+    ('Housing & Rent', 'personal', 'expense', 0, NULL, 100),
+    ('Mortgage', 'personal', 'expense', 0, NULL, 101),
+    ('Property Tax', 'personal', 'expense', 0, NULL, 102),
+    ('Home Utilities', 'personal', 'expense', 0, NULL, 103),
+    ('Home Internet', 'personal', 'expense', 0, NULL, 104),
+    ('Phone & Mobile', 'personal', 'expense', 0, NULL, 105),
+    ('Streaming & Subscriptions', 'personal', 'expense', 0, NULL, 106),
+    ('Groceries', 'personal', 'expense', 0, NULL, 107),
+    ('Dining Out', 'personal', 'expense', 0, NULL, 108),
+    ('Coffee Shops', 'personal', 'expense', 0, NULL, 109),
+    ('Food Delivery', 'personal', 'expense', 0, NULL, 110),
+    ('Alcohol & Bars', 'personal', 'expense', 0, NULL, 111),
+    ('Entertainment', 'personal', 'expense', 0, NULL, 112),
+    ('Gaming', 'personal', 'expense', 0, NULL, 113),
+    ('Books & Media', 'personal', 'expense', 0, NULL, 114),
+    ('Hobbies', 'personal', 'expense', 0, NULL, 115),
+    ('Healthcare', 'personal', 'expense', 0, NULL, 116),
+    ('Dental', 'personal', 'expense', 0, NULL, 117),
+    ('Pharmacy & Prescriptions', 'personal', 'expense', 0, NULL, 118),
+    ('Vision & Optical', 'personal', 'expense', 0, NULL, 119),
+    ('Personal Insurance', 'personal', 'expense', 0, NULL, 120),
+    ('Personal Transport', 'personal', 'expense', 0, NULL, 121),
+    ('Public Transit', 'personal', 'expense', 0, NULL, 122),
+    ('Rideshare & Taxi', 'personal', 'expense', 0, NULL, 123),
+    ('Fuel & Gas (Personal)', 'personal', 'expense', 0, NULL, 124),
+    ('Vehicle Maintenance', 'personal', 'expense', 0, NULL, 125),
+    ('Parking & Tolls', 'personal', 'expense', 0, NULL, 126),
+    ('Clothing & Apparel', 'personal', 'expense', 0, NULL, 127),
+    ('Shopping', 'personal', 'expense', 0, NULL, 128),
+    ('Electronics & Gadgets', 'personal', 'expense', 0, NULL, 129),
+    ('Home Improvement', 'personal', 'expense', 0, NULL, 130),
+    ('Furniture & Appliances', 'personal', 'expense', 0, NULL, 131),
+    ('Personal Care & Beauty', 'personal', 'expense', 0, NULL, 132),
+    ('Fitness & Gym', 'personal', 'expense', 0, NULL, 133),
+    ('Education (Personal)', 'personal', 'expense', 0, NULL, 134),
+    ('Childcare', 'personal', 'expense', 0, NULL, 135),
+    ('Kids & Family', 'personal', 'expense', 0, NULL, 136),
+    ('Pet Care', 'personal', 'expense', 0, NULL, 137),
+    ('Gifts', 'personal', 'expense', 0, NULL, 138),
+    ('Charitable Donations', 'personal', 'expense', 0, NULL, 139),
+    ('Travel & Vacation', 'personal', 'expense', 0, NULL, 140),
+    ('Hotels & Lodging', 'personal', 'expense', 0, NULL, 141),
+    ('Banking Fees', 'personal', 'expense', 0, NULL, 142),
+    ('Loan Payments', 'personal', 'expense', 0, NULL, 143),
+    ('Credit Card Payments', 'personal', 'expense', 0, NULL, 144),
+    ('Savings & Investments', 'personal', 'expense', 0, NULL, 145),
+    ('Taxes (Personal)', 'personal', 'expense', 0, NULL, 146),
+    ('Other Personal Expense', 'personal', 'expense', 0, NULL, 147),
+    -- ── Cross-domain ──
+    ('Transfer', 'both', 'expense', 0, NULL, 200),
+    ('Refund', 'both', 'income', 0, NULL, 201),
+    ('Uncategorized', 'both', 'expense', 0, NULL, 999);
 
 -- Merchant Aliases
 INSERT OR IGNORE INTO merchant_aliases (canonical, alias, category, domain) VALUES
@@ -706,8 +800,8 @@ class EmailAccountantDB:
 # Helper: init all years
 # ---------------------------------------------------------------------------
 
-def init_all_dbs(start_year: int = 2020, end_year: Optional[int] = None):
-    """Initialize databases for a range of years."""
+def init_all_dbs(start_year: int = 2006, end_year: Optional[int] = None):
+    """Initialize databases for a range of years (defaults to 2006→current)."""
     if end_year is None:
         end_year = datetime.now().year + 1
     
@@ -728,25 +822,9 @@ def init_all_dbs(start_year: int = 2020, end_year: Optional[int] = None):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    paths = init_all_dbs(2024, 2026)
-    print(f"✅ Initialized databases:")
+    # Initialize a ledger file for every year from 2006 to the current year.
+    paths = init_all_dbs()
+    print("✅ Initialized databases (2006 → current year):")
     for p in paths:
         size = os.path.getsize(p)
         print(f"   {p} ({size:,} bytes)")
-    
-    # Test insert
-    db = EmailAccountantDB(2026)
-    email_id = db.insert_email({
-        "gmail_message_id": "test123",
-        "from_header": "Stripe <receipts@stripe.com>",
-        "subject": "Your receipt from Acme Corp",
-        "email_date": "2026-06-15T10:00:00",
-        "snippet": "Thank you for your payment of $49.99",
-        "from_email": "receipts@stripe.com",
-        "from_name": "Stripe",
-        "email_status": "pending"
-    })
-    print(f"\n📧 Inserted email ID: {email_id}")
-    print(f"📧 Retrieved: {db.get_email(email_id)}")
-    db.close()
-    print("\n✅ Database test passed!")

@@ -46,11 +46,22 @@ the breakdowns show; the other currency's net is always shown alongside so
 nothing is hidden. At filing time, convert USD figures to CAD using
 Bank of Canada rates for your CRA return.
 
+### Categories
+
+The ledger seeds a comprehensive taxonomy (~100 categories across personal /
+business and income / expense). Business expense categories carry both an IRS
+Schedule C line and a CRA T2125 line mapping, so both tax views populate
+automatically. You assign any category from the **Review** queue. Edit the list
+in `db/database.py` (`SEED_SQL`) — it stays in sync with the Supabase migration.
+
 ## Run it locally
 
 Requires Python 3.11+ and Node 18+.
 
 ```bash
+# 0. (Optional) pre-create a ledger file for every year 2006 → now
+python db/database.py
+
 # 1. Backend deps
 cd webapp/backend
 pip install -r requirements.txt

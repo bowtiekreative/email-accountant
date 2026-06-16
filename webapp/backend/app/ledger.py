@@ -322,16 +322,83 @@ def scan_history(limit: int = 25) -> list[dict[str, Any]]:
 # no explicit tax_category. Meals carry the standard 50% limit.
 T2125_EXPENSE_LINES = {
     "Marketing & Advertising": "8521 Advertising",
+    "Online Ads": "8521 Advertising",
+    "Charitable Sponsorship": "8521 Advertising",
     "Travel & Meals": "8523 Meals and entertainment (50%)",
+    "Meals & Entertainment": "8523 Meals and entertainment (50%)",
     "Dining Out": "8523 Meals and entertainment (50%)",
-    "Internet & Telecom": "9220 Telephone and utilities",
+    "Business Insurance": "8690 Insurance",
+    "Interest & Bank Fees": "8710 Interest and bank charges",
+    "Merchant & Processing Fees": "8710 Interest and bank charges",
+    "Banking Fees": "8710 Interest and bank charges",
+    "Licenses & Permits": "8760 Business taxes, licences, memberships",
+    "Dues & Memberships": "8760 Business taxes, licences, memberships",
+    "Taxes & Fees (Business)": "8760 Business taxes, licences, memberships",
     "Office Supplies": "8811 Office stationery and supplies",
+    "Materials & Supplies": "8811 Office stationery and supplies",
     "Software & Subscriptions": "8810 Office expenses",
+    "Web Hosting & Domains": "8810 Office expenses",
+    "Equipment & Hardware": "8810 Office expenses",
     "Professional Services": "8860 Professional fees",
-    "Equipment & Hardware": "9270 Other expenses (capital / CCA)",
+    "Contractors & Freelancers": "8360 Subcontracts",
+    "Wages & Payroll": "9060 Salaries, wages, benefits",
+    "Employee Benefits": "9060 Salaries, wages, benefits",
+    "Office Rent": "8910 Rent",
     "Housing & Rent": "8910 Rent",
+    "Repairs & Maintenance": "8960 Repairs and maintenance",
+    "Business Travel": "9200 Travel",
+    "Internet & Telecom": "9220 Telephone and utilities",
+    "Utilities (Business)": "9220 Telephone and utilities",
+    "Vehicle & Auto": "9281 Motor vehicle expenses",
+    "Fuel & Gas (Business)": "9224 Fuel costs",
+    "Shipping & Postage": "9275 Delivery, freight and express",
+    "Inventory & COGS": "8320 Cost of goods sold (purchases)",
+    "Depreciation": "9936 Capital cost allowance (CCA)",
+    "Home Office": "9945 Business-use-of-home expenses",
+    "Education & Training": "9270 Other expenses",
+    "Other Business Expense": "9270 Other expenses",
 }
 T2125_INCOME_LINE = "8000 Sales / business income"
+
+# App category -> IRS Schedule C expense line. Used when a transaction has no
+# explicit tax_category.
+SCHEDULE_C_EXPENSE_LINES = {
+    "Marketing & Advertising": "Line 8 Advertising",
+    "Online Ads": "Line 8 Advertising",
+    "Charitable Sponsorship": "Line 8 Advertising",
+    "Vehicle & Auto": "Line 9 Car and truck expenses",
+    "Fuel & Gas (Business)": "Line 9 Car and truck expenses",
+    "Merchant & Processing Fees": "Line 10 Commissions and fees",
+    "Contractors & Freelancers": "Line 11 Contract labor",
+    "Equipment & Hardware": "Line 13 Depreciation (Section 179)",
+    "Depreciation": "Line 13 Depreciation",
+    "Employee Benefits": "Line 14 Employee benefit programs",
+    "Business Insurance": "Line 15 Insurance",
+    "Interest & Bank Fees": "Line 16b Interest (other)",
+    "Banking Fees": "Line 16b Interest (other)",
+    "Professional Services": "Line 17 Legal and professional services",
+    "Office Supplies": "Line 18 Office expense",
+    "Software & Subscriptions": "Line 18 Office expense",
+    "Office Rent": "Line 20b Rent (other business property)",
+    "Repairs & Maintenance": "Line 21 Repairs and maintenance",
+    "Materials & Supplies": "Line 22 Supplies",
+    "Licenses & Permits": "Line 23 Taxes and licenses",
+    "Taxes & Fees (Business)": "Line 23 Taxes and licenses",
+    "Dues & Memberships": "Line 23 Taxes and licenses",
+    "Business Travel": "Line 24a Travel",
+    "Travel & Meals": "Line 24b Meals (50%)",
+    "Meals & Entertainment": "Line 24b Meals (50%)",
+    "Dining Out": "Line 24b Meals (50%)",
+    "Internet & Telecom": "Line 25 Utilities",
+    "Utilities (Business)": "Line 25 Utilities",
+    "Wages & Payroll": "Line 26 Wages",
+    "Web Hosting & Domains": "Line 27a Other expenses",
+    "Shipping & Postage": "Line 27a Other expenses",
+    "Education & Training": "Line 27a Other expenses",
+    "Inventory & COGS": "Line 4 Cost of goods sold",
+    "Home Office": "Line 30 Home office",
+    "Other Business Expense": "Line 27a Other expenses",
+}
 
 
 def _line_aggregate(
@@ -376,10 +443,17 @@ def schedule_c(year: int, currency: str = "USD") -> dict[str, Any]:
     txs = list_transactions(
         year=year, domain="business", currency=currency, limit=1_000_000
     )
+
+    def _line(t: dict[str, Any]) -> str:
+        # Prefer an explicit IRS tax_category; otherwise map from the category.
+        explicit = t.get("tax_category")
+        if explicit and explicit.lower().startswith("line"):
+            return explicit
+        cat = t.get("category") or ""
+        return SCHEDULE_C_EXPENSE_LINES.get(cat, "Line 27a Other expenses")
+
     agg = _line_aggregate(
-        txs,
-        lambda t: t.get("tax_category") or t.get("category") or "Uncategorized",
-        income_line="Gross receipts (Line 1)",
+        txs, _line, income_line="Gross receipts (Line 1)"
     )
     return {"year": year, "currency": currency, "form": "US Schedule C", **agg}
 
