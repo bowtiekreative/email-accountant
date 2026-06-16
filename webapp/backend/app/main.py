@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import ledger, planning, reminders, scans
+from . import invest, learning, ledger, planning, reminders, scans
 from .config import FRONTEND_ORIGIN
 
 app = FastAPI(title="Email Accountant API", version="1.0.0")
@@ -99,6 +99,11 @@ def categories() -> list[dict[str, Any]]:
     return ledger.list_categories()
 
 
+@app.get("/api/learned-rules")
+def learned_rules() -> list[dict[str, Any]]:
+    return learning.list_rules()
+
+
 @app.get("/api/reports/schedule-c")
 def schedule_c(year: int, currency: str = "USD") -> dict[str, Any]:
     return ledger.schedule_c(year, currency=currency)
@@ -183,6 +188,35 @@ def apply_recommendations(currency: str = "USD") -> dict[str, Any]:
 @app.get("/api/plan")
 def yearly_plan(year: int, currency: str = "USD") -> dict[str, Any]:
     return planning.yearly_plan(year, currency=currency)
+
+
+# ---------------------------------------------------------------------------
+# Invest / wealth suite
+# ---------------------------------------------------------------------------
+
+@app.get("/api/invest/advice")
+def invest_advice(currency: str = "USD") -> dict[str, Any]:
+    return invest.wealth_advice(currency=currency)
+
+
+class CompoundIn(BaseModel):
+    principal: float = 0.0
+    monthly_contribution: float = 0.0
+    annual_rate: float = 0.08
+    years: int = 20
+
+
+@app.post("/api/invest/compound")
+def invest_compound(payload: CompoundIn) -> dict[str, Any]:
+    return invest.compound_growth(
+        payload.principal, payload.monthly_contribution,
+        payload.annual_rate, payload.years,
+    )
+
+
+@app.get("/api/invest/fire")
+def invest_fire(annual_expense: float, withdrawal_rate: float = 0.04) -> dict[str, Any]:
+    return invest.fire_number(annual_expense, withdrawal_rate)
 
 
 # ---------------------------------------------------------------------------

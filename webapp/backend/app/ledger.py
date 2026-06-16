@@ -247,7 +247,9 @@ def overview(year: Optional[int] = None, currency: Optional[str] = None) -> dict
     }
 
 
-def update_transaction(composite_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+def update_transaction(
+    composite_id: str, changes: dict[str, Any], learn: bool = True
+) -> dict[str, Any]:
     if ":" not in composite_id:
         raise ValueError("Invalid transaction id")
     stem, _, rowid = composite_id.partition(":")
@@ -277,7 +279,19 @@ def update_transaction(composite_id: str, changes: dict[str, Any]) -> dict[str, 
         ).fetchone()
     if not row:
         raise FileNotFoundError("Transaction not found")
-    return _row_to_tx(row, stem)
+
+    result = _row_to_tx(row, stem)
+
+    # Learn from a classification correction: save a merchant rule and apply it
+    # to past transactions from the same merchant.
+    learned = None
+    if learn and any(k in safe for k in ("domain", "transaction_type", "category")):
+        merchant = row["merchant_name"]
+        if merchant:
+            from . import learning
+            learned = learning.learn_from_edit(merchant, safe, exclude_id=int(rowid))
+    result["_learned"] = learned
+    return result
 
 
 def list_categories() -> list[dict[str, Any]]:

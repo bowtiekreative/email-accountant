@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, fmt, type Overview } from "@/lib/api";
+import { api, fmt, type Overview, type Reminder } from "@/lib/api";
 import YearPicker from "@/components/YearPicker";
 import CurrencyPicker from "@/components/CurrencyPicker";
 
@@ -62,6 +62,7 @@ export default function Dashboard() {
   const [year, setYear] = useState<number | undefined>(undefined);
   const [currency, setCurrency] = useState<string>("");
   const [data, setData] = useState<Overview | null>(null);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +75,10 @@ export default function Dashboard() {
       })
       .catch((e) => setError(String(e)));
   }, [year, currency]);
+
+  useEffect(() => {
+    api.reminders().then(setReminders).catch(() => setReminders([]));
+  }, []);
 
   const active = currency || data?.active_currency || "USD";
   const totals = data?.totals_by_currency[active];
@@ -106,6 +111,31 @@ export default function Dashboard() {
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
           Could not reach the API at <code>{api.base}</code>. Is the backend
           running? ({error})
+        </div>
+      )}
+
+      {reminders.length > 0 && (
+        <div className="space-y-2">
+          {reminders.slice(0, 3).map((r, i) => (
+            <Link
+              key={i}
+              href="/planning"
+              className={`block rounded-lg border px-4 py-2 text-sm transition hover:opacity-90 ${
+                r.severity === "high"
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : r.severity === "medium"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-slate-200 bg-slate-50 text-slate-600"
+              }`}
+            >
+              🔔 {r.message}
+            </Link>
+          ))}
+          {reminders.length > 3 && (
+            <Link href="/planning" className="text-xs text-slate-400 hover:text-ink">
+              +{reminders.length - 3} more in Planning → Reminders
+            </Link>
+          )}
         </div>
       )}
 

@@ -154,6 +154,38 @@ export type Reminder = {
   message: string;
 };
 
+export type CompoundResult = {
+  principal: number;
+  monthly_contribution: number;
+  annual_rate: number;
+  years: number;
+  future_value: number;
+  total_contributed: number;
+  total_growth: number;
+  series: { year: number; balance: number; contributed: number; growth: number }[];
+};
+
+export type WealthAdvice = {
+  currency: string;
+  cashflow: {
+    months: number;
+    monthly_income: number;
+    monthly_expense: number;
+    monthly_surplus: number;
+    monthly_discretionary: number;
+    annual_expense: number;
+    top_discretionary: { category: string; monthly: number }[];
+  };
+  active_subscription_burn: number;
+  inactive_subscription_monthly: number;
+  recommended_monthly_investment: number;
+  fire: { annual_expense: number; withdrawal_rate: number; fire_number: number; note: string };
+  years_to_financial_independence: number | null;
+  tips: { title: string; severity: string; body: string }[];
+  principles: string[];
+  disclaimer: string;
+};
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${res.status} ${path}`);
@@ -208,6 +240,21 @@ export const api = {
     get<YearlyPlan>(`/api/plan?year=${year}&currency=${currency}`),
   reminders: (currency?: string) =>
     get<Reminder[]>(`/api/reminders${currency ? `?currency=${currency}` : ""}`),
+  wealthAdvice: (currency = "USD") =>
+    get<WealthAdvice>(`/api/invest/advice?currency=${currency}`),
+  async compound(input: {
+    principal: number;
+    monthly_contribution: number;
+    annual_rate: number;
+    years: number;
+  }) {
+    const res = await fetch(`${API_BASE}/api/invest/compound`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return res.json() as Promise<CompoundResult>;
+  },
   async setBudget(category: string, monthly_limit: number, currency: string) {
     const res = await fetch(`${API_BASE}/api/budgets`, {
       method: "POST",

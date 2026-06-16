@@ -13,6 +13,7 @@ export default function ReviewPage() {
   const [rows, setRows] = useState<Transaction[] | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = () => {
     api
@@ -29,7 +30,16 @@ export default function ReviewPage() {
   async function patch(id: string, changes: TransactionPatch) {
     setSaving(id);
     try {
-      await api.updateTransaction(id, changes);
+      const res = (await api.updateTransaction(id, changes)) as Transaction & {
+        _learned?: { updated_past?: number; merchant?: string } | null;
+      };
+      const learned = res._learned;
+      if (learned && (learned.updated_past ?? 0) > 0) {
+        setToast(
+          `Learned ${learned.merchant} → also fixed ${learned.updated_past} past transaction(s).`
+        );
+        setTimeout(() => setToast(null), 5000);
+      }
     } finally {
       setSaving(null);
     }
@@ -53,8 +63,15 @@ export default function ReviewPage() {
       </div>
       <p className="text-sm text-slate-500">
         Low-confidence or unknown transactions. Fix the classification, then
-        approve to clear it from the queue.
+        approve to clear it from the queue. Corrections are remembered and applied
+        to past transactions from the same merchant.
       </p>
+
+      {toast && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
+          ✨ {toast}
+        </div>
+      )}
 
       {rows === null && <div className="text-slate-400">Loading…</div>}
       {rows?.length === 0 && (

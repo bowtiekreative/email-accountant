@@ -581,6 +581,49 @@ def canonical_category(category: Optional[str]) -> str:
     return CATEGORY_ALIASES.get(cat, cat)
 
 
+# ===========================================================================
+# LEARNED RULES — corrections you make in the Review queue become rules, so the
+# same merchant is classified correctly forever after. Read from the main
+# ledger DB; written by the webapp (app/learning.py).
+# ===========================================================================
+
+_LEARNED_CACHE: Optional[dict] = None
+
+
+def _main_db_path() -> str:
+    db_dir = os.environ.get(
+        "EMAIL_ACCOUNTANT_DB_DIR", str(Path.home() / ".email-accountant" / "data")
+    )
+    return os.path.join(db_dir, "email_accountant.db")
+
+
+def load_learned_rules(force: bool = False) -> dict:
+    """Load merchant→classification overrides learned from manual edits."""
+    global _LEARNED_CACHE
+    if _LEARNED_CACHE is not None and not force:
+        return _LEARNED_CACHE
+    rules: dict = {}
+    path = _main_db_path()
+    if os.path.exists(path):
+        try:
+            import sqlite3
+            conn = sqlite3.connect(path)
+            conn.row_factory = sqlite3.Row
+            has = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='learned_rules'"
+            ).fetchone()
+            if has:
+                for r in conn.execute(
+                    "SELECT merchant_key, domain, tx_type, category FROM learned_rules"
+                ):
+                    rules[r["merchant_key"]] = (r["domain"], r["tx_type"], r["category"])
+            conn.close()
+        except Exception:
+            pass
+    _LEARNED_CACHE = rules
+    return rules
+
+
 def classify_merchant(name: str, description: str = "", amount: float = 0.0, from_email: str = "") -> Tuple[str, str, str, float]:
     """Public classifier: runs the rule engine, then canonicalizes the category
     so it always matches the seeded taxonomy."""
@@ -705,6 +748,12 @@ def _classify_merchant_raw(name: str, description: str = "", amount: float = 0.0
     if 'uber eats' in desc_lower or 'order with uber eats' in desc_lower:
         return ('personal', 'expense', 'Dining Out', 0.90)
     
+    # 0d. Learned rules win over the built-in tables — these are your own
+    #     corrections from the Review queue.
+    for key, (d, t, c) in load_learned_rules().items():
+        if key and key in name_lower:
+            return (d, t, c, 0.99)
+
     # 0. Check if it's a Google Play purchase (PayPal processor for Google).
     #    Only for actual Google Play strings ("GOOGLE *CHATGPT") — guarding on
     #    'google' avoids short app keys (e.g. 'king') matching names like

@@ -24,6 +24,13 @@ categorization, and the SQLite ledgers (`db/database.py`) and adds a UI + API.
     map to T2125 Part 4 line numbers, meals at the 50% limit.
   - **US Schedule C** (USD) — for US-sourced business activity.
   - **GST/HST** — taxable sales and eligible-expense bases (CAD).
+- **Invest & Build Wealth** — Buffett-style guidance from your real cashflow:
+  personalized advice (pay yourself first, kill zombie subscriptions, redirect
+  your biggest discretionary leak), a compound-growth calculator, and a
+  financial-independence (FIRE) estimator. Educational, not licensed advice.
+- **Learn from edits** — when you re-categorize a merchant in the Review queue,
+  the correction is saved as a rule, applied to all past transactions from that
+  merchant, and used automatically on future scans.
 - **Planning** — one page, four tabs:
   - **Yearly Plan** — projects the year's income/expense/net from data so far,
     and shows spending vs budget per category.
@@ -169,6 +176,10 @@ The data layer already supports Supabase/Postgres. Set `EMAIL_ACCOUNTANT_DB=supa
 | POST | `/api/budgets/apply-recommendations?currency=` | Apply all suggestions |
 | GET | `/api/plan?year=&currency=` | Yearly projection |
 | GET/POST | `/api/reminders` | Preview / email the digest |
+| GET | `/api/invest/advice?currency=` | Personalized wealth advice |
+| POST | `/api/invest/compound` | Compound-growth calculator |
+| GET | `/api/invest/fire?annual_expense=` | Financial-independence number |
+| GET | `/api/learned-rules` | Rules learned from your edits |
 | POST | `/api/backup` | Back up all ledgers |
 
 Transaction IDs are `"<ledger-file>:<rowid>"` so edits route to the correct
