@@ -48,11 +48,25 @@ Bank of Canada rates for your CRA return.
 
 ### Categories
 
-The ledger seeds a comprehensive taxonomy (~100 categories across personal /
+The ledger seeds a comprehensive taxonomy (~109 categories across personal /
 business and income / expense). Business expense categories carry both an IRS
 Schedule C line and a CRA T2125 line mapping, so both tax views populate
-automatically. You assign any category from the **Review** queue. Edit the list
-in `db/database.py` (`SEED_SQL`) — it stays in sync with the Supabase migration.
+automatically. Edit the list in `db/database.py` (`SEED_SQL`) — it stays in sync
+with the Supabase migration.
+
+**How a transaction gets its category** (in `pipeline/processor.py`):
+1. **Rule engine** (`classify_merchant`) — a large merchant table maps known
+   senders/merchants to a specific category (matched most-specific-first), with
+   sender-domain and keyword fallbacks. Granular categories are used directly
+   (e.g. Starbucks → Coffee Shops, Shell → Fuel, Air Canada → Travel).
+2. **Canonicalization** — every result is normalized to a name that exists in
+   the taxonomy (so reports and the Review dropdown always line up).
+3. **LLM fallback** (`run_llm_classify.py`) — low-confidence/unknown rows are
+   sent to a local LLM, which is given the full category list from the DB and
+   picks the best fit.
+4. **Review queue** — anything still low-confidence is flagged for you to set by
+   hand. Unknown merchants get a low-confidence guess (never a confident wrong
+   answer), so they surface for review rather than hiding.
 
 ## Run it locally
 

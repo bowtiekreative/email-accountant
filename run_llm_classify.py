@@ -3,7 +3,26 @@ import sys, os, json, re, time, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from db.database import EmailAccountantDB
+from pipeline.processor import canonical_category
 from datetime import datetime
+
+# Populated from the categories table at runtime (single source of truth).
+CATEGORY_GUIDE = ""
+
+
+def build_category_guide(db) -> str:
+    """Build the LLM's list of allowed categories from the taxonomy table."""
+    rows = db._conn.execute(
+        "SELECT name, domain, tx_type FROM categories ORDER BY domain, tx_type, sort_order"
+    ).fetchall()
+    groups: dict = {}
+    for r in rows:
+        groups.setdefault(f"{r['domain']} {r['tx_type']}", []).append(r["name"])
+    lines = []
+    for header in ("business income", "business expense", "personal income", "personal expense"):
+        if groups.get(header):
+            lines.append(f"{header.title()}: " + ", ".join(groups[header]))
+    return "\n".join(lines)
 
 LLM_URL = "http://127.0.0.1:8080/v1/chat/completions"
 LLAMA_CLI = os.path.expanduser("~/.local/bin/llama/llama-cli")
@@ -36,8 +55,9 @@ def classify_batch(transactions):
         subject = (t.get('subject') or '')[:100]
         items.append(f"- Merchant: {t['merchant'] or 'Unknown'} | Amount: ${t['amount']:.2f} | Subject: {subject}")
     
-    user_prompt = "Classify these transactions:\n\n" + "\n".join(items) + "\n\nRespond ONLY with a JSON array: [{\"domain\": \"...\", \"type\": \"...\", \"category\": \"...\", \"reasoning\": \"...\"}]"
-    full_prompt = f"<|system|>You are a financial transaction classifier. Determine domain (personal/business), type (income/expense), and category for each.</s>\n<|user|>{user_prompt}</s>\n<|assistant|>"
+    guide = f"\n\nChoose the category from this list (use the exact name):\n{CATEGORY_GUIDE}" if CATEGORY_GUIDE else ""
+    user_prompt = "Classify these transactions:\n\n" + "\n".join(items) + guide + "\n\nRespond ONLY with a JSON array: [{\"domain\": \"...\", \"type\": \"...\", \"category\": \"...\", \"reasoning\": \"...\"}]"
+    full_prompt = f"<|system|>You are a financial transaction classifier. Determine domain (personal/business), type (income/expense), and a specific category for each, picking the category from the provided list.</s>\n<|user|>{user_prompt}</s>\n<|assistant|>"
     
     try:
         result = subprocess.run(
@@ -71,6 +91,7 @@ def classify_batch(transactions):
 # Main
 yr = datetime.now().year
 db = EmailAccountantDB(yr)
+CATEGORY_GUIDE = build_category_guide(db)
 
 # Get transactions needing review with email info
 rows = db._conn.execute("""
@@ -108,7 +129,7 @@ for i in range(0, len(rows), batch_size):
                 txn_id = batch[j]["id"]
                 domain = cls.get("domain", "unknown")
                 tx_type = cls.get("type", "unknown")
-                category = cls.get("category", "uncategorized")
+                category = canonical_category(cls.get("category", "uncategorized"))
                 reasoning = cls.get("reasoning", "")
                 
                 # Validate

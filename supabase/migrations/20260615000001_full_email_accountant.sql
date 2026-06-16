@@ -577,7 +577,11 @@ INSERT INTO categories (name, domain, type, tax_relevant, irs_line, sort_order) 
     ('Credit Card Payments', 'personal', 'expense', FALSE, NULL, 144),
     ('Savings & Investments', 'personal', 'expense', FALSE, NULL, 145),
     ('Taxes (Personal)', 'personal', 'expense', FALSE, NULL, 146),
-    ('Other Personal Expense', 'personal', 'expense', FALSE, NULL, 147),
+    ('Social Media', 'personal', 'expense', FALSE, NULL, 147),
+    ('E-Commerce', 'personal', 'expense', FALSE, NULL, 148),
+    ('Loans & Financing', 'personal', 'expense', FALSE, NULL, 149),
+    ('Suspected Scam', 'personal', 'expense', FALSE, NULL, 150),
+    ('Other Personal Expense', 'personal', 'expense', FALSE, NULL, 151),
     -- Cross-domain
     ('Transfer', 'both', 'expense', FALSE, NULL, 200),
     ('Refund', 'both', 'income', FALSE, NULL, 201),

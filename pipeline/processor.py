@@ -147,7 +147,6 @@ MERCHANT_CATEGORIES = {
     'hulu': ('personal', 'expense', 'Entertainment'),
     'hbo': ('personal', 'expense', 'Entertainment'),
     'king.com': ('personal', 'expense', 'Entertainment'),
-    'king': ('personal', 'expense', 'Entertainment'),
 
     # === PERSONAL: Dining Out ===
     'doordash': ('personal', 'expense', 'Dining Out'),
@@ -201,6 +200,216 @@ MERCHANT_CATEGORIES = {
     # === PERSONAL: Miscellaneous — actual meaningful sub-categories ===
     'nymag': ('personal', 'expense', 'Entertainment'),
     'billiongraves': ('personal', 'expense', 'Shopping'),
+
+    # =====================================================================
+    # EXPANDED MERCHANT RULES — granular categories
+    # (matched longest-key-first, so specific names win over generic ones)
+    # =====================================================================
+
+    # ── Groceries ──
+    'loblaws': ('personal', 'expense', 'Groceries'),
+    'no frills': ('personal', 'expense', 'Groceries'),
+    'real canadian superstore': ('personal', 'expense', 'Groceries'),
+    'superstore': ('personal', 'expense', 'Groceries'),
+    'sobeys': ('personal', 'expense', 'Groceries'),
+    'metro inc': ('personal', 'expense', 'Groceries'),
+    'food basics': ('personal', 'expense', 'Groceries'),
+    'freshco': ('personal', 'expense', 'Groceries'),
+    'save-on-foods': ('personal', 'expense', 'Groceries'),
+    'whole foods': ('personal', 'expense', 'Groceries'),
+    'trader joe': ('personal', 'expense', 'Groceries'),
+    'kroger': ('personal', 'expense', 'Groceries'),
+    'safeway': ('personal', 'expense', 'Groceries'),
+    'aldi': ('personal', 'expense', 'Groceries'),
+
+    # ── Coffee Shops ──
+    'starbucks': ('personal', 'expense', 'Coffee Shops'),
+    'tim hortons': ('personal', 'expense', 'Coffee Shops'),
+    'tim horton': ('personal', 'expense', 'Coffee Shops'),
+    'second cup': ('personal', 'expense', 'Coffee Shops'),
+    'dunkin': ('personal', 'expense', 'Coffee Shops'),
+
+    # ── Dining Out (restaurants / fast food) ──
+    'mcdonald': ('personal', 'expense', 'Dining Out'),
+    'burger king': ('personal', 'expense', 'Dining Out'),
+    'wendy': ('personal', 'expense', 'Dining Out'),
+    'subway': ('personal', 'expense', 'Dining Out'),
+    'chipotle': ('personal', 'expense', 'Dining Out'),
+    'taco bell': ('personal', 'expense', 'Dining Out'),
+    'popeyes': ('personal', 'expense', 'Dining Out'),
+    'a&w': ('personal', 'expense', 'Dining Out'),
+    'harvey': ('personal', 'expense', 'Dining Out'),
+    'swiss chalet': ('personal', 'expense', 'Dining Out'),
+    'boston pizza': ('personal', 'expense', 'Dining Out'),
+
+    # ── Food Delivery ──
+    'doordash': ('personal', 'expense', 'Food Delivery'),
+    'grubhub': ('personal', 'expense', 'Food Delivery'),
+    'instacart': ('personal', 'expense', 'Groceries'),
+
+    # ── Pharmacy & Health ──
+    'shoppers drug mart': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'rexall': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'pharmaprix': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'walgreens': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'cvs pharmacy': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'london drugs': ('personal', 'expense', 'Pharmacy & Prescriptions'),
+    'lenscrafters': ('personal', 'expense', 'Vision & Optical'),
+
+    # ── Fitness & Gym ──
+    'goodlife': ('personal', 'expense', 'Fitness & Gym'),
+    'planet fitness': ('personal', 'expense', 'Fitness & Gym'),
+    'la fitness': ('personal', 'expense', 'Fitness & Gym'),
+    'anytime fitness': ('personal', 'expense', 'Fitness & Gym'),
+    'peloton': ('personal', 'expense', 'Fitness & Gym'),
+
+    # ── Phone & Mobile ──
+    'rogers': ('personal', 'expense', 'Phone & Mobile'),
+    'fido': ('personal', 'expense', 'Phone & Mobile'),
+    'koodo': ('personal', 'expense', 'Phone & Mobile'),
+    'virgin mobile': ('personal', 'expense', 'Phone & Mobile'),
+    'at&t': ('personal', 'expense', 'Phone & Mobile'),
+    'verizon': ('personal', 'expense', 'Phone & Mobile'),
+    't-mobile': ('personal', 'expense', 'Phone & Mobile'),
+
+    # ── Home Utilities ──
+    'enbridge': ('personal', 'expense', 'Home Utilities'),
+    'epcor': ('personal', 'expense', 'Home Utilities'),
+    'fortis': ('personal', 'expense', 'Home Utilities'),
+    'direct energy': ('personal', 'expense', 'Home Utilities'),
+    'hydro': ('personal', 'expense', 'Home Utilities'),
+
+    # ── Streaming & Subscriptions ──
+    'crave': ('personal', 'expense', 'Streaming & Subscriptions'),
+    'paramount+': ('personal', 'expense', 'Streaming & Subscriptions'),
+    'apple tv': ('personal', 'expense', 'Streaming & Subscriptions'),
+    'prime video': ('personal', 'expense', 'Streaming & Subscriptions'),
+    'audible': ('personal', 'expense', 'Books & Media'),
+    'kindle': ('personal', 'expense', 'Books & Media'),
+    'kobo': ('personal', 'expense', 'Books & Media'),
+    'indigo': ('personal', 'expense', 'Books & Media'),
+
+    # ── Travel & Vacation / Hotels ──
+    'air canada': ('personal', 'expense', 'Travel & Vacation'),
+    'westjet': ('personal', 'expense', 'Travel & Vacation'),
+    'delta air': ('personal', 'expense', 'Travel & Vacation'),
+    'united airlines': ('personal', 'expense', 'Travel & Vacation'),
+    'american airlines': ('personal', 'expense', 'Travel & Vacation'),
+    'expedia': ('personal', 'expense', 'Travel & Vacation'),
+    'booking.com': ('personal', 'expense', 'Travel & Vacation'),
+    'airbnb': ('personal', 'expense', 'Hotels & Lodging'),
+    'vrbo': ('personal', 'expense', 'Hotels & Lodging'),
+    'marriott': ('personal', 'expense', 'Hotels & Lodging'),
+    'hilton': ('personal', 'expense', 'Hotels & Lodging'),
+    'holiday inn': ('personal', 'expense', 'Hotels & Lodging'),
+    'best western': ('personal', 'expense', 'Hotels & Lodging'),
+
+    # ── Public Transit ──
+    'presto': ('personal', 'expense', 'Public Transit'),
+    'translink': ('personal', 'expense', 'Public Transit'),
+    'go transit': ('personal', 'expense', 'Public Transit'),
+    'via rail': ('personal', 'expense', 'Public Transit'),
+
+    # ── Fuel & Gas (Personal) ──
+    'petro-canada': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'petro canada': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'esso': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'shell': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'chevron': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'husky': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+    'ultramar': ('personal', 'expense', 'Fuel & Gas (Personal)'),
+
+    # ── Clothing & Apparel ──
+    'lululemon': ('personal', 'expense', 'Clothing & Apparel'),
+    'old navy': ('personal', 'expense', 'Clothing & Apparel'),
+    'uniqlo': ('personal', 'expense', 'Clothing & Apparel'),
+    'nordstrom': ('personal', 'expense', 'Clothing & Apparel'),
+    'winners': ('personal', 'expense', 'Clothing & Apparel'),
+    'h&m': ('personal', 'expense', 'Clothing & Apparel'),
+
+    # ── Electronics & Gadgets ──
+    'best buy': ('personal', 'expense', 'Electronics & Gadgets'),
+    'newegg': ('personal', 'expense', 'Electronics & Gadgets'),
+    'canada computers': ('personal', 'expense', 'Electronics & Gadgets'),
+
+    # ── Home Improvement / Furniture ──
+    'home depot': ('personal', 'expense', 'Home Improvement'),
+    'lowe': ('personal', 'expense', 'Home Improvement'),
+    'rona': ('personal', 'expense', 'Home Improvement'),
+    'canadian tire': ('personal', 'expense', 'Home Improvement'),
+    'ikea': ('personal', 'expense', 'Furniture & Appliances'),
+
+    # ── Pet Care ──
+    'chewy': ('personal', 'expense', 'Pet Care'),
+
+    # ── Charitable Donations ──
+    'gofundme': ('personal', 'expense', 'Charitable Donations'),
+    'red cross': ('personal', 'expense', 'Charitable Donations'),
+    'unicef': ('personal', 'expense', 'Charitable Donations'),
+
+    # ── Personal Insurance ──
+    'geico': ('personal', 'expense', 'Personal Insurance'),
+    'state farm': ('personal', 'expense', 'Personal Insurance'),
+    'intact insurance': ('personal', 'expense', 'Personal Insurance'),
+    'sun life': ('personal', 'expense', 'Personal Insurance'),
+    'manulife': ('personal', 'expense', 'Personal Insurance'),
+    'allstate': ('personal', 'expense', 'Personal Insurance'),
+
+    # ── BUSINESS: Software & Subscriptions (more) ──
+    'quickbooks': ('business', 'expense', 'Software & Subscriptions'),
+    'xero': ('business', 'expense', 'Software & Subscriptions'),
+    'wave hq': ('business', 'expense', 'Software & Subscriptions'),
+    'asana': ('business', 'expense', 'Software & Subscriptions'),
+    'trello': ('business', 'expense', 'Software & Subscriptions'),
+    'atlassian': ('business', 'expense', 'Software & Subscriptions'),
+    'airtable': ('business', 'expense', 'Software & Subscriptions'),
+    'calendly': ('business', 'expense', 'Software & Subscriptions'),
+    'typeform': ('business', 'expense', 'Software & Subscriptions'),
+    'zapier': ('business', 'expense', 'Software & Subscriptions'),
+    'docusign': ('business', 'expense', 'Software & Subscriptions'),
+    'grammarly': ('business', 'expense', 'Software & Subscriptions'),
+    'loom': ('business', 'expense', 'Software & Subscriptions'),
+    'miro': ('business', 'expense', 'Software & Subscriptions'),
+    'dropbox': ('business', 'expense', 'Software & Subscriptions'),
+    '1password': ('business', 'expense', 'Software & Subscriptions'),
+    'nordvpn': ('business', 'expense', 'Software & Subscriptions'),
+    'squarespace': ('business', 'expense', 'Software & Subscriptions'),
+    'wix': ('business', 'expense', 'Software & Subscriptions'),
+
+    # ── BUSINESS: Web Hosting & Domains ──
+    'wpengine': ('business', 'expense', 'Web Hosting & Domains'),
+    'wp engine': ('business', 'expense', 'Web Hosting & Domains'),
+    'kinsta': ('business', 'expense', 'Web Hosting & Domains'),
+    'bluehost': ('business', 'expense', 'Web Hosting & Domains'),
+    'dreamhost': ('business', 'expense', 'Web Hosting & Domains'),
+    'linode': ('business', 'expense', 'Web Hosting & Domains'),
+    'backblaze': ('business', 'expense', 'Web Hosting & Domains'),
+
+    # ── BUSINESS: Marketing / Ads ──
+    'klaviyo': ('business', 'expense', 'Marketing & Advertising'),
+    'convertkit': ('business', 'expense', 'Marketing & Advertising'),
+    'activecampaign': ('business', 'expense', 'Marketing & Advertising'),
+    'constant contact': ('business', 'expense', 'Marketing & Advertising'),
+    'semrush': ('business', 'expense', 'Marketing & Advertising'),
+    'ahrefs': ('business', 'expense', 'Marketing & Advertising'),
+    'google ads': ('business', 'expense', 'Online Ads'),
+    'adwords': ('business', 'expense', 'Online Ads'),
+    'linkedin ads': ('business', 'expense', 'Online Ads'),
+    'tiktok ads': ('business', 'expense', 'Online Ads'),
+
+    # ── BUSINESS: Contractors / Marketplaces ──
+    'freelancer.com': ('business', 'expense', 'Contractors & Freelancers'),
+    '99designs': ('business', 'expense', 'Contractors & Freelancers'),
+
+    # ── BUSINESS: Shipping & Postage ──
+    'canada post': ('business', 'expense', 'Shipping & Postage'),
+    'purolator': ('business', 'expense', 'Shipping & Postage'),
+    'fedex': ('business', 'expense', 'Shipping & Postage'),
+    'ups store': ('business', 'expense', 'Shipping & Postage'),
+    'dhl': ('business', 'expense', 'Shipping & Postage'),
+
+    # ── BUSINESS: Professional Services ──
+    'zendesk': ('business', 'expense', 'Professional Services'),
 }
 
 # Google Play app → real merchant/category mapping
@@ -335,6 +544,51 @@ SENDER_DOMAIN_CLASSIFICATION = {
     'mailchimp.com': ('business', 'expense', 'Marketing & Advertising', 0.85),
 }
 
+# Merchant keys ordered longest-first for most-specific-match-wins behaviour.
+_MERCHANT_KEYS_BY_LEN = sorted(MERCHANT_CATEGORIES.keys(), key=len, reverse=True)
+
+
+# ===========================================================================
+# CATEGORY CANONICALIZATION
+# Maps legacy / shorthand category names emitted by the rules and the LLM onto
+# the canonical taxonomy seeded in db/database.py, so every stored transaction
+# uses a name that exists in the categories table (review dropdown + reports).
+# ===========================================================================
+
+CATEGORY_ALIASES = {
+    'Transport': 'Personal Transport',
+    'Marketing': 'Marketing & Advertising',
+    'Education & Learning': 'Education (Personal)',
+    'Housing': 'Housing & Rent',
+    'Miscellaneous Income': 'Other Personal Income',
+    'Miscellaneous': 'Uncategorized',
+    'Misc': 'Uncategorized',
+    # Non-categories / processing artifacts → flagged for review
+    'unresolved': 'Uncategorized',
+    'Forwarded Email': 'Uncategorized',
+    'Email Bounce': 'Uncategorized',
+    'uncategorized': 'Uncategorized',
+    'uncategorized-business': 'Other Business Expense',
+    'uncategorized-personal': 'Other Personal Expense',
+}
+
+
+def canonical_category(category: Optional[str]) -> str:
+    """Normalize a category name to the canonical taxonomy."""
+    if not category:
+        return 'Uncategorized'
+    cat = category.strip()
+    return CATEGORY_ALIASES.get(cat, cat)
+
+
+def classify_merchant(name: str, description: str = "", amount: float = 0.0, from_email: str = "") -> Tuple[str, str, str, float]:
+    """Public classifier: runs the rule engine, then canonicalizes the category
+    so it always matches the seeded taxonomy."""
+    domain, tx_type, category, confidence = _classify_merchant_raw(
+        name, description, amount, from_email
+    )
+    return domain, tx_type, canonical_category(category), confidence
+
 
 # ===========================================================================
 # AMOUNT PATTERNS
@@ -383,7 +637,7 @@ def extract_google_play_merchant(merchant_name: str) -> Optional[Tuple[str, str,
     return None
 
 
-def classify_merchant(name: str, description: str = "", amount: float = 0.0, from_email: str = "") -> Tuple[str, str, str, float]:
+def _classify_merchant_raw(name: str, description: str = "", amount: float = 0.0, from_email: str = "") -> Tuple[str, str, str, float]:
     """
     Classify a transaction using exhaustive rules.
     Returns (domain, transaction_type, category, confidence).
@@ -408,14 +662,20 @@ def classify_merchant(name: str, description: str = "", amount: float = 0.0, fro
     if 'uber eats' in desc_lower or 'order with uber eats' in desc_lower:
         return ('personal', 'expense', 'Dining Out', 0.90)
     
-    # 0. Check if it's a Google Play purchase (PayPal processor for Google)
-    gp_result = extract_google_play_merchant(name_lower)
-    if gp_result:
-        return gp_result
+    # 0. Check if it's a Google Play purchase (PayPal processor for Google).
+    #    Only for actual Google Play strings ("GOOGLE *CHATGPT") — guarding on
+    #    'google' avoids short app keys (e.g. 'king') matching names like
+    #    "booking.com".
+    if 'google' in name_lower:
+        gp_result = extract_google_play_merchant(name_lower)
+        if gp_result:
+            return gp_result
     
-    # 1. Try direct merchant match (most specific)
-    for key, result in MERCHANT_CATEGORIES.items():
+    # 1. Try direct merchant match (longest/most-specific key first, so e.g.
+    #    "uber eats" beats "uber" and "booking.com" beats "king").
+    for key in _MERCHANT_KEYS_BY_LEN:
         if key in name_lower:
+            result = MERCHANT_CATEGORIES[key]
             if result is not None:
                 return (*result, 0.95)
     
