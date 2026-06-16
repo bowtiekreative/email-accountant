@@ -32,9 +32,38 @@ MERCHANT_CATEGORIES = {
     'shutterstock': ('business', 'expense', 'Professional Services'),
 
     # === PERSONAL: Entertainment ===
-    'playstation': ('personal', 'expense', 'Entertainment'),
+    'playstation': ('personal', 'expense', 'Gaming'),
     'samsung': ('personal', 'expense', 'Marketing'),
     'skrill': ('personal', 'expense', 'Shopping'),
+    'sonyentertainmentnetwork': ('personal', 'expense', 'Gaming'),
+    'sony interactive': ('personal', 'expense', 'Gaming'),
+    'psn': ('personal', 'expense', 'Gaming'),
+
+    # === PERSONAL: Education & Learning ===
+    'pluralsight': ('personal', 'expense', 'Education & Learning'),
+    'lynda': ('personal', 'expense', 'Education & Learning'),
+    'jobscan': ('personal', 'expense', 'Education & Learning'),
+    'bcgurus': ('personal', 'expense', 'Education & Learning'),
+    'skillshare': ('personal', 'expense', 'Education & Learning'),
+    'coursera': ('personal', 'expense', 'Education & Learning'),
+
+    # === PERSONAL: Food Delivery (separate from general Dining Out) ===
+    'just eat': ('personal', 'expense', 'Food Delivery'),
+    'pizza73': ('personal', 'expense', 'Food Delivery'),
+    'pizza hut': ('personal', 'expense', 'Food Delivery'),
+    'domino': ('personal', 'expense', 'Food Delivery'),
+    'skip the dishes': ('personal', 'expense', 'Food Delivery'),
+
+    # === PERSONAL: E-Commerce / Marketplace ===
+    'kijiji': ('personal', 'expense', 'E-Commerce'),
+    'marktplaats': ('personal', 'expense', 'E-Commerce'),
+    'ebay': ('personal', 'expense', 'E-Commerce'),
+
+    # === PERSONAL: Social Media ===
+    'tiktok': ('personal', 'expense', 'Social Media'),
+
+    # === PERSONAL: Gaming (in-app purchases) ===
+    'miniclip': ('personal', 'expense', 'Gaming'),
 
     # === PERSONAL: Dining Out / Food ===
     'uber eats': ('personal', 'expense', 'Dining Out'),
@@ -97,14 +126,12 @@ MERCHANT_CATEGORIES = {
     'ko-fi': ('business', 'income', 'Client Payments'),
     'koho': ('personal', 'income', 'Miscellaneous Income'),  # Tax refund/cashback
 
-    # === PERSONAL: Entertainment (dating apps, gaming, streaming) ===
+    # === PERSONAL: Entertainment (dating apps, streaming) ===
     'grindr': ('personal', 'expense', 'Entertainment'),
     'tinder': ('personal', 'expense', 'Entertainment'),
     'bumble': ('personal', 'expense', 'Entertainment'),
     'plenty of fish': ('personal', 'expense', 'Entertainment'),
     'pof': ('personal', 'expense', 'Entertainment'),
-    'tiktok': ('personal', 'expense', 'Entertainment'),
-    'miniclip': ('personal', 'expense', 'Entertainment'),
     'netflix': ('personal', 'expense', 'Entertainment'),
     'spotify': ('personal', 'expense', 'Entertainment'),
     'disney+': ('personal', 'expense', 'Entertainment'),
@@ -142,7 +169,16 @@ MERCHANT_CATEGORIES = {
     'ancestry': ('personal', 'expense', 'Entertainment'),
     'udemy': ('business', 'expense', 'Software & Subscriptions'),
     'descript': ('business', 'expense', 'Software & Subscriptions'),
-
+    'freshbooks': ('business', 'expense', 'Software & Subscriptions'),
+    'podio': ('business', 'expense', 'Software & Subscriptions'),
+    'zoom': ('business', 'expense', 'Software & Subscriptions'),
+    'dollar photo club': ('business', 'expense', 'Software & Subscriptions'),
+    'envato': ('business', 'expense', 'Software & Subscriptions'),
+    'appsumo': ('business', 'expense', 'Software & Subscriptions'),
+    'ai21': ('business', 'expense', 'Software & Subscriptions'),
+    'trellis': ('business', 'expense', 'Software & Subscriptions'),
+    'notion': ('business', 'expense', 'Software & Subscriptions'),  # Notion.so
+  
     # === PERSONAL: Software & Subscriptions ===
     'google play': ('personal', 'expense', 'Entertainment'),
     'google storage': ('personal', 'expense', 'Software & Subscriptions'),
