@@ -7,7 +7,7 @@ const links = [
   { href: "/", label: "Dashboard" },
   { href: "/transactions", label: "Transactions" },
   { href: "/review", label: "Review" },
-  { href: "/tax", label: "Tax / Schedule C" },
+  { href: "/tax", label: "Tax" },
   { href: "/scans", label: "Scans" },
 ];
 

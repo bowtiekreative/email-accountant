@@ -19,19 +19,25 @@ export default function TransactionsPage() {
   const [year, setYear] = useState<number | undefined>(undefined);
   const [domain, setDomain] = useState("");
   const [type, setType] = useState("");
+  const [currency, setCurrency] = useState("");
+  const [currencies, setCurrencies] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Transaction[] | null>(null);
+
+  useEffect(() => {
+    api.currencies().then(setCurrencies).catch(() => setCurrencies([]));
+  }, []);
 
   useEffect(() => {
     setRows(null);
     const t = setTimeout(() => {
       api
-        .transactions({ year, domain, type, q, limit: 500 })
+        .transactions({ year, domain, type, currency, q, limit: 500 })
         .then(setRows)
         .catch(() => setRows([]));
     }, 200);
     return () => clearTimeout(t);
-  }, [year, domain, type, q]);
+  }, [year, domain, type, currency, q]);
 
   return (
     <div className="space-y-5">
@@ -58,6 +64,20 @@ export default function TransactionsPage() {
           <option value="income">Income</option>
           <option value="expense">Expense</option>
         </select>
+        {currencies.length > 1 && (
+          <select
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="">All currencies</option>
+            {currencies.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
           placeholder="Search merchant or subject…"
@@ -75,20 +95,21 @@ export default function TransactionsPage() {
               <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Domain</th>
               <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Cur</th>
               <th className="px-4 py-3 text-right">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows === null && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   Loading…
                 </td>
               </tr>
             )}
             {rows?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   No transactions found.
                 </td>
               </tr>
@@ -117,6 +138,11 @@ export default function TransactionsPage() {
                     {t.transaction_type}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+                    {t.currency}
+                  </span>
+                </td>
                 <td
                   className={`whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums ${
                     t.transaction_type === "income"
@@ -124,7 +150,7 @@ export default function TransactionsPage() {
                       : "text-slate-800"
                   }`}
                 >
-                  {fmt(t.amount)}
+                  {fmt(t.amount, t.currency)}
                 </td>
               </tr>
             ))}

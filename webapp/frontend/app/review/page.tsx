@@ -73,7 +73,12 @@ export default function ReviewPage() {
               <div>
                 <div className="font-semibold text-ink">
                   {t.merchant_name || "Unknown merchant"} ·{" "}
-                  <span className="tabular-nums">{fmt(t.amount)}</span>
+                  <span className="tabular-nums">
+                    {fmt(t.amount, t.currency)}
+                  </span>
+                  <span className="ml-1 text-xs text-slate-400">
+                    {t.currency}
+                  </span>
                 </div>
                 <div className="text-xs text-slate-400">
                   {(t.email_date || "").slice(0, 10)} · {t.email_subject}

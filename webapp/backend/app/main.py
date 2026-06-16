@@ -35,8 +35,13 @@ def years() -> list[int]:
 
 
 @app.get("/api/overview")
-def overview(year: Optional[int] = None) -> dict[str, Any]:
-    return ledger.overview(year=year)
+def overview(year: Optional[int] = None, currency: Optional[str] = None) -> dict[str, Any]:
+    return ledger.overview(year=year, currency=currency)
+
+
+@app.get("/api/currencies")
+def currencies() -> list[str]:
+    return ledger.available_currencies()
 
 
 @app.get("/api/transactions")
@@ -47,6 +52,7 @@ def transactions(
     category: Optional[str] = None,
     q: Optional[str] = None,
     needs_review: Optional[bool] = None,
+    currency: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -57,6 +63,7 @@ def transactions(
         category=category,
         q=q,
         needs_review=needs_review,
+        currency=currency,
         limit=limit,
         offset=offset,
     )
@@ -93,8 +100,18 @@ def categories() -> list[dict[str, Any]]:
 
 
 @app.get("/api/reports/schedule-c")
-def schedule_c(year: int) -> dict[str, Any]:
-    return ledger.schedule_c(year)
+def schedule_c(year: int, currency: str = "USD") -> dict[str, Any]:
+    return ledger.schedule_c(year, currency=currency)
+
+
+@app.get("/api/reports/t2125")
+def t2125(year: int, currency: str = "CAD") -> dict[str, Any]:
+    return ledger.t2125(year, currency=currency)
+
+
+@app.get("/api/reports/gst-hst")
+def gst_hst(year: int, currency: str = "CAD") -> dict[str, Any]:
+    return ledger.gst_hst(year, currency=currency)
 
 
 @app.get("/api/scans")

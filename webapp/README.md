@@ -18,10 +18,23 @@ categorization, and the SQLite ledgers (`db/database.py`) and adds a UI + API.
 - **Transactions** — searchable, filterable ledger view (year / domain / type).
 - **Review queue** — fix domain, type, category and deductibility on
   low-confidence or `unknown` transactions, then approve to clear them.
-- **Tax · Schedule C** — IRS-line aggregation, deductible totals, print/export
-  to PDF for your accountant.
+- **Tax** — one page, three tabs for a Canadian sole proprietor doing US
+  business:
+  - **CRA T2125** (CAD) — Canadian Statement of Business Activities; expenses
+    map to T2125 Part 4 line numbers, meals at the 50% limit.
+  - **US Schedule C** (USD) — for US-sourced business activity.
+  - **GST/HST** — taxable sales and eligible-expense bases (CAD).
 - **Scans** — trigger the Gmail scan pipeline from the UI and watch progress;
   see scan history.
+
+### Currency
+
+CAD and USD are tracked **separately with no FX conversion** — every amount
+shows in its own currency (`$` = USD, `CA$` = CAD) and totals are never added
+across currencies. A currency toggle on the dashboard switches which currency
+the breakdowns show; the other currency's net is always shown alongside so
+nothing is hidden. At filing time, convert USD figures to CAD using
+Bank of Canada rates for your CRA return.
 
 ## Run it locally
 
@@ -75,11 +88,14 @@ The data layer already supports Supabase/Postgres. Set `EMAIL_ACCOUNTANT_DB=supa
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/overview?year=` | Dashboard aggregates |
-| GET | `/api/transactions?year=&domain=&type=&q=&needs_review=` | Ledger list |
+| GET | `/api/overview?year=&currency=` | Dashboard aggregates (totals split by currency) |
+| GET | `/api/currencies` | Currencies present in the ledger |
+| GET | `/api/transactions?year=&domain=&type=&currency=&q=&needs_review=` | Ledger list |
 | PATCH | `/api/transactions/{id}` | Edit a transaction (review) |
 | GET | `/api/categories` | Category list |
-| GET | `/api/reports/schedule-c?year=` | Tax aggregation |
+| GET | `/api/reports/t2125?year=&currency=CAD` | CRA T2125 (Canada) |
+| GET | `/api/reports/schedule-c?year=&currency=USD` | US Schedule C |
+| GET | `/api/reports/gst-hst?year=&currency=CAD` | GST/HST summary |
 | GET/POST | `/api/scans` | History / trigger a scan |
 
 Transaction IDs are `"<ledger-file>:<rowid>"` so edits route to the correct

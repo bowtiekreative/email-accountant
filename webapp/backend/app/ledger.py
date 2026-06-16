@@ -79,7 +79,18 @@ def available_years() -> list[int]:
 def _row_to_tx(row: sqlite3.Row, stem: str) -> dict[str, Any]:
     d = dict(row)
     d["id"] = f"{stem}:{d['id']}"
+    # Normalize currency so CAD/USD grouping is reliable.
+    d["currency"] = (d.get("currency") or "USD").upper()
     return d
+
+
+def available_currencies() -> list[str]:
+    """Distinct currencies present across all ledgers (CAD/USD first)."""
+    txs = list_transactions(limit=1_000_000)
+    found = {t["currency"] for t in txs}
+    ordered = [c for c in ("USD", "CAD") if c in found]
+    ordered += sorted(found - set(ordered))
+    return ordered or ["USD"]
 
 
 def list_transactions(
@@ -89,6 +100,7 @@ def list_transactions(
     category: Optional[str] = None,
     q: Optional[str] = None,
     needs_review: Optional[bool] = None,
+    currency: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -97,6 +109,9 @@ def list_transactions(
     if year:
         where.append("substr(email_date,1,4) = ?")
         params.append(str(year))
+    if currency:
+        where.append("COALESCE(NULLIF(currency,''), 'USD') = ?")
+        params.append(currency)
     if domain:
         where.append("domain = ?")
         params.append(domain)
@@ -140,10 +155,7 @@ def list_transactions(
     return deduped[offset : offset + limit]
 
 
-def overview(year: Optional[int] = None) -> dict[str, Any]:
-    """Aggregate dashboard numbers across all ledgers for a year (or all)."""
-    txs = list_transactions(year=year, limit=1_000_000)
-
+def _totals(txs: list[dict[str, Any]]) -> dict[str, Any]:
     income = sum(t["amount"] for t in txs if t.get("transaction_type") == "income")
     expense = sum(t["amount"] for t in txs if t.get("transaction_type") == "expense")
     business_expense = sum(
@@ -156,9 +168,44 @@ def overview(year: Optional[int] = None) -> dict[str, Any]:
         for t in txs
         if t.get("is_deductible")
     )
+    return {
+        "income": round(income, 2),
+        "expense": round(expense, 2),
+        "net": round(income - expense, 2),
+        "business_expense": round(business_expense, 2),
+        "deductible": round(deductible, 2),
+        "transaction_count": len(txs),
+    }
+
+
+def overview(year: Optional[int] = None, currency: Optional[str] = None) -> dict[str, Any]:
+    """Aggregate dashboard numbers across all ledgers for a year (or all).
+
+    CAD and USD are kept separate (no FX conversion). ``totals_by_currency``
+    always lists every currency; the category/merchant/trend breakdowns use the
+    selected ``currency`` (or the most common one when none is given).
+    """
+    all_txs = list_transactions(year=year, limit=1_000_000)
+    currencies = available_currencies()
+
+    totals_by_currency = {
+        cur: _totals([t for t in all_txs if t["currency"] == cur]) for cur in currencies
+    }
+
     needs_review = sum(
-        1 for t in txs if t.get("needs_review") or t.get("domain") == "unknown"
+        1 for t in all_txs if t.get("needs_review") or t.get("domain") == "unknown"
     )
+
+    # Pick the active currency for the breakdowns.
+    if currency and currency in currencies:
+        active = currency
+    else:
+        active = max(
+            currencies,
+            key=lambda c: totals_by_currency[c]["transaction_count"],
+            default="USD",
+        )
+    txs = [t for t in all_txs if t["currency"] == active]
 
     def _bucket(key_fn, type_filter=None):
         agg: dict[str, dict] = {}
@@ -171,7 +218,6 @@ def overview(year: Optional[int] = None) -> dict[str, Any]:
             b["count"] += 1
         return sorted(agg.values(), key=lambda x: x["total"], reverse=True)
 
-    # Monthly trend (income vs expense).
     months: dict[str, dict] = {}
     for t in txs:
         m = (t.get("email_date") or "")[:7]
@@ -185,15 +231,10 @@ def overview(year: Optional[int] = None) -> dict[str, Any]:
 
     return {
         "year": year,
-        "totals": {
-            "income": round(income, 2),
-            "expense": round(expense, 2),
-            "net": round(income - expense, 2),
-            "business_expense": round(business_expense, 2),
-            "deductible": round(deductible, 2),
-            "transaction_count": len(txs),
-            "needs_review": needs_review,
-        },
+        "currencies": currencies,
+        "active_currency": active,
+        "totals_by_currency": totals_by_currency,
+        "needs_review": needs_review,
         "by_category": _bucket(lambda t: t.get("category"), "expense")[:12],
         "by_merchant": _bucket(lambda t: t.get("merchant_name"), "expense")[:12],
         "by_domain": _bucket(lambda t: t.get("domain")),
@@ -268,31 +309,119 @@ def scan_history(limit: int = 25) -> list[dict[str, Any]]:
     return out[:limit]
 
 
-def schedule_c(year: int) -> dict[str, Any]:
-    """IRS Schedule C style aggregation for business transactions."""
-    txs = list_transactions(year=year, domain="business", limit=1_000_000)
+# ---------------------------------------------------------------------------
+# Tax category mappings
+# ---------------------------------------------------------------------------
 
+# App category -> CRA T2125 expense line (Part 4). Used when a transaction has
+# no explicit tax_category. Meals carry the standard 50% limit.
+T2125_EXPENSE_LINES = {
+    "Marketing & Advertising": "8521 Advertising",
+    "Travel & Meals": "8523 Meals and entertainment (50%)",
+    "Dining Out": "8523 Meals and entertainment (50%)",
+    "Internet & Telecom": "9220 Telephone and utilities",
+    "Office Supplies": "8811 Office stationery and supplies",
+    "Software & Subscriptions": "8810 Office expenses",
+    "Professional Services": "8860 Professional fees",
+    "Equipment & Hardware": "9270 Other expenses (capital / CCA)",
+    "Housing & Rent": "8910 Rent",
+}
+T2125_INCOME_LINE = "8000 Sales / business income"
+
+
+def _line_aggregate(
+    txs: list[dict[str, Any]],
+    expense_line_fn,
+    income_line: str,
+) -> dict[str, Any]:
     income_lines: dict[str, dict] = {}
     expense_lines: dict[str, dict] = {}
     for t in txs:
-        line = t.get("tax_category") or t.get("category") or "Uncategorized"
-        target = income_lines if t.get("transaction_type") == "income" else expense_lines
-        b = target.setdefault(line, {"line": line, "total": 0.0, "deductible": 0.0, "count": 0})
         amt = t.get("amount") or 0
-        b["total"] += amt
-        b["count"] += 1
-        if t.get("transaction_type") == "expense":
+        if t.get("transaction_type") == "income":
+            b = income_lines.setdefault(
+                income_line, {"line": income_line, "total": 0.0, "deductible": 0.0, "count": 0}
+            )
+            b["total"] += amt
+            b["count"] += 1
+        else:
+            line = expense_line_fn(t)
+            b = expense_lines.setdefault(
+                line, {"line": line, "total": 0.0, "deductible": 0.0, "count": 0}
+            )
+            b["total"] += amt
+            b["count"] += 1
             rate = t.get("deduction_rate") or (1.0 if t.get("is_deductible") else 0.0)
             b["deductible"] += amt * rate
 
     gross = sum(b["total"] for b in income_lines.values())
     total_deductible = sum(b["deductible"] for b in expense_lines.values())
     return {
-        "year": year,
         "gross_income": round(gross, 2),
         "total_expenses": round(sum(b["total"] for b in expense_lines.values()), 2),
         "total_deductible": round(total_deductible, 2),
         "net_profit": round(gross - total_deductible, 2),
         "income": sorted(income_lines.values(), key=lambda x: x["total"], reverse=True),
         "expenses": sorted(expense_lines.values(), key=lambda x: x["deductible"], reverse=True),
+    }
+
+
+def schedule_c(year: int, currency: str = "USD") -> dict[str, Any]:
+    """IRS Schedule C (US) aggregation for business transactions."""
+    txs = list_transactions(
+        year=year, domain="business", currency=currency, limit=1_000_000
+    )
+    agg = _line_aggregate(
+        txs,
+        lambda t: t.get("tax_category") or t.get("category") or "Uncategorized",
+        income_line="Gross receipts (Line 1)",
+    )
+    return {"year": year, "currency": currency, "form": "US Schedule C", **agg}
+
+
+def t2125(year: int, currency: str = "CAD") -> dict[str, Any]:
+    """CRA T2125 (Canada) aggregation for business transactions."""
+    txs = list_transactions(
+        year=year, domain="business", currency=currency, limit=1_000_000
+    )
+
+    def _line(t: dict[str, Any]) -> str:
+        cat = t.get("category") or ""
+        return T2125_EXPENSE_LINES.get(cat, "9270 Other expenses")
+
+    agg = _line_aggregate(txs, _line, income_line=T2125_INCOME_LINE)
+    return {"year": year, "currency": currency, "form": "CRA T2125", **agg}
+
+
+def gst_hst(year: int, currency: str = "CAD") -> dict[str, Any]:
+    """GST/HST summary for Canadian business activity.
+
+    GST/HST you may have *collected* on sales, and input tax credits (ITCs) on
+    expenses. Where a linked receipt recorded an explicit tax amount we use it;
+    otherwise the tax portion is shown as unknown so nothing is invented.
+    """
+    txs = list_transactions(
+        year=year, domain="business", currency=currency, limit=1_000_000
+    )
+
+    sales = sum(t["amount"] for t in txs if t.get("transaction_type") == "income")
+    sales_count = sum(1 for t in txs if t.get("transaction_type") == "income")
+    expenses = sum(t["amount"] for t in txs if t.get("transaction_type") == "expense")
+    expense_count = sum(1 for t in txs if t.get("transaction_type") == "expense")
+
+    return {
+        "year": year,
+        "currency": currency,
+        "taxable_sales": round(sales, 2),
+        "sales_count": sales_count,
+        "eligible_expenses": round(expenses, 2),
+        "expense_count": expense_count,
+        # Explicit tax amounts are not yet captured per-transaction in the
+        # ledger, so we surface the bases and let the user apply their rate.
+        "note": (
+            "GST/HST collected and input tax credits depend on the exact tax "
+            "portion of each transaction, which the pipeline does not yet store "
+            "separately. These are the taxable bases — apply your registered "
+            "rate (e.g. 5% GST or your provincial HST) at filing time."
+        ),
     }

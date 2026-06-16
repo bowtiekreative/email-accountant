@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, fmt, type ScheduleC } from "@/lib/api";
+import { api, fmt, type GstHst, type TaxReport } from "@/lib/api";
+
+type Tab = "t2125" | "schedulec" | "gst";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "t2125", label: "🇨🇦 CRA T2125" },
+  { id: "schedulec", label: "🇺🇸 US Schedule C" },
+  { id: "gst", label: "GST / HST" },
+];
 
 export default function TaxPage() {
   const [years, setYears] = useState<number[]>([]);
   const [year, setYear] = useState<number | undefined>(undefined);
-  const [data, setData] = useState<ScheduleC | null>(null);
+  const [tab, setTab] = useState<Tab>("t2125");
 
   useEffect(() => {
     api.years().then((ys) => {
@@ -15,14 +23,10 @@ export default function TaxPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (year) api.scheduleC(year).then(setData).catch(() => setData(null));
-  }, [year]);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between print:hidden">
-        <h1 className="text-2xl font-bold text-ink">Tax · Schedule C</h1>
+        <h1 className="text-2xl font-bold text-ink">Tax</h1>
         <div className="flex items-center gap-3">
           <select
             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
@@ -44,38 +48,38 @@ export default function TaxPage() {
         </div>
       </div>
 
-      {!data && <div className="text-slate-400">Loading…</div>}
+      <div className="flex gap-1 border-b border-slate-200 print:hidden">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium transition ${
+              tab === t.id
+                ? "border-b-2 border-accent text-ink"
+                : "text-slate-500 hover:text-ink"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {data && (
-        <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Card label="Gross income" value={fmt(data.gross_income)} tone="good" />
-            <Card label="Total expenses" value={fmt(data.total_expenses)} />
-            <Card
-              label="Deductible"
-              value={fmt(data.total_deductible)}
-              tone="warn"
-            />
-            <Card
-              label="Net profit"
-              value={fmt(data.net_profit)}
-              tone={data.net_profit >= 0 ? "good" : "bad"}
-            />
-          </div>
-
-          <Section title="Income (Part I)" rows={data.income} showDeductible={false} />
-          <Section
-            title="Expenses (Part II)"
-            rows={data.expenses}
-            showDeductible
-          />
-
-          <p className="text-xs text-slate-400">
-            Generated for {data.year}. Lines map to IRS Schedule C via each
-            transaction&apos;s tax category. Review with your accountant before
-            filing.
-          </p>
-        </>
+      {year && tab === "t2125" && (
+        <FormView
+          key={`t2125-${year}`}
+          load={() => api.t2125(year)}
+          intro="Canadian sole-proprietor business income (Form T2125), in CAD. Expense lines map to CRA Part 4 line numbers."
+        />
+      )}
+      {year && tab === "schedulec" && (
+        <FormView
+          key={`schedc-${year}`}
+          load={() => api.scheduleC(year)}
+          intro="US Schedule C view, in USD — useful for your US-sourced business activity."
+        />
+      )}
+      {year && tab === "gst" && (
+        <GstView key={`gst-${year}`} load={() => api.gstHst(year)} />
       )}
     </div>
   );
@@ -106,13 +110,83 @@ function Card({
   );
 }
 
+function FormView({
+  load,
+  intro,
+}: {
+  load: () => Promise<TaxReport>;
+  intro: string;
+}) {
+  const [data, setData] = useState<TaxReport | null>(null);
+  useEffect(() => {
+    setData(null);
+    load().then(setData).catch(() => setData(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!data) return <div className="text-slate-400">Loading…</div>;
+  const cur = data.currency;
+  return (
+    <>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+        {data.form} · {data.year} · amounts in {cur}. {intro}
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Card label="Gross income" value={fmt(data.gross_income, cur)} tone="good" />
+        <Card label="Total expenses" value={fmt(data.total_expenses, cur)} />
+        <Card label="Deductible" value={fmt(data.total_deductible, cur)} tone="warn" />
+        <Card
+          label="Net profit"
+          value={fmt(data.net_profit, cur)}
+          tone={data.net_profit >= 0 ? "good" : "bad"}
+        />
+      </div>
+      <Section title="Income" rows={data.income} currency={cur} showDeductible={false} />
+      <Section title="Expenses" rows={data.expenses} currency={cur} showDeductible />
+      <p className="text-xs text-slate-400">
+        Lines are mapped automatically from each transaction&apos;s category.
+        Review with your accountant before filing.
+      </p>
+    </>
+  );
+}
+
+function GstView({ load }: { load: () => Promise<GstHst> }) {
+  const [data, setData] = useState<GstHst | null>(null);
+  useEffect(() => {
+    setData(null);
+    load().then(setData).catch(() => setData(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!data) return <div className="text-slate-400">Loading…</div>;
+  const cur = data.currency;
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <Card label="Taxable sales (CAD)" value={fmt(data.taxable_sales, cur)} tone="good" />
+        <Card label="Eligible expenses (CAD)" value={fmt(data.eligible_expenses, cur)} />
+      </div>
+      <div className="flex gap-6 text-sm text-slate-500">
+        <span>{data.sales_count} sales</span>
+        <span>{data.expense_count} expenses</span>
+      </div>
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        {data.note}
+      </div>
+    </>
+  );
+}
+
 function Section({
   title,
   rows,
+  currency,
   showDeductible,
 }: {
   title: string;
   rows: { line: string; total: number; deductible: number; count: number }[];
+  currency: string;
   showDeductible: boolean;
 }) {
   return (
@@ -123,12 +197,10 @@ function Section({
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
           <tr>
-            <th className="px-5 py-2">IRS line / category</th>
+            <th className="px-5 py-2">Line / category</th>
             <th className="px-5 py-2 text-right">Count</th>
             <th className="px-5 py-2 text-right">Total</th>
-            {showDeductible && (
-              <th className="px-5 py-2 text-right">Deductible</th>
-            )}
+            {showDeductible && <th className="px-5 py-2 text-right">Deductible</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -146,11 +218,11 @@ function Section({
                 {r.count}
               </td>
               <td className="px-5 py-2 text-right tabular-nums">
-                {fmt(r.total)}
+                {fmt(r.total, currency)}
               </td>
               {showDeductible && (
                 <td className="px-5 py-2 text-right font-medium tabular-nums text-amber-700">
-                  {fmt(r.deductible)}
+                  {fmt(r.deductible, currency)}
                 </td>
               )}
             </tr>
