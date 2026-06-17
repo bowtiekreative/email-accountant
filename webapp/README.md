@@ -1,3 +1,9 @@
+> **Status: optional.** The project now routes the scanner's output into a
+> self-hosted stack (Paperless-ngx · Akaunting · Firefly III · Strapi) — see
+> [`../docs/STACK.md`](../docs/STACK.md). This custom dashboard still works and
+> is handy as a unified read-only view, but the tools' own UIs are now the
+> primary interface.
+
 # 📬 Email Accountant — Webapp
 
 A personal, single-user web app on top of the existing Email Accountant engine.

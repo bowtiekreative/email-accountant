@@ -1,0 +1,2 @@
+# Dependencies for the stack connectors (integrations/) and sync_to_stack.py
+requests>=2.31

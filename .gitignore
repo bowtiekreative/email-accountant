@@ -8,3 +8,8 @@ node_modules/
 .next/
 .venv/
 *.tsbuildinfo
+
+# self-hosted stack
+.env.stack
+strapi/app/
+stack-data/

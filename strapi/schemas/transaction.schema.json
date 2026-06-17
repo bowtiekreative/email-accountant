@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "transactions",
+  "info": {
+    "singularName": "transaction",
+    "pluralName": "transactions",
+    "displayName": "Transaction",
+    "description": "Unified index of every routed transaction across the stack."
+  },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "source_id": { "type": "string", "required": true, "unique": true },
+    "date": { "type": "date" },
+    "amount": { "type": "decimal" },
+    "currency": { "type": "string" },
+    "direction": { "type": "string" },
+    "domain": { "type": "string" },
+    "merchant": { "type": "string" },
+    "category": { "type": "string" },
+    "account_label": { "type": "string" },
+    "routed_to": { "type": "string" },
+    "akaunting_id": { "type": "string" },
+    "firefly_id": { "type": "string" },
+    "paperless_tasks": { "type": "json" },
+    "synced_at": { "type": "datetime" }
+  }
+}

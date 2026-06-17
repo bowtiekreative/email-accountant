@@ -1,0 +1,18 @@
+{
+  "kind": "collectionType",
+  "collectionName": "sync_logs",
+  "info": {
+    "singularName": "sync-log",
+    "pluralName": "sync-logs",
+    "displayName": "Sync Log",
+    "description": "Audit trail of every sync attempt from the email scanner into the stack."
+  },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "source_id": { "type": "string" },
+    "routed_to": { "type": "string" },
+    "status": { "type": "string" },
+    "detail": { "type": "text" },
+    "synced_at": { "type": "datetime" }
+  }
+}

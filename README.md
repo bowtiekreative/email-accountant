@@ -2,6 +2,22 @@
 
 > **AI-powered email accountant** — scans your Gmail inbox for receipts, invoices, payments, and financial emails. Extracts data via OCR, categorizes as personal/business, builds a year-organized ledger, generates spending insights, and produces tax-ready reports.
 
+## 🏗️ Architecture: ingestion engine → self-hosted stack
+
+The scanner/classifier is the **ingestion engine**; its output is routed into
+mature self-hosted tools (**Paperless-ngx** for documents, **Akaunting** for
+business accounting, **Firefly III** for personal budgeting, **Strapi** as the
+orchestration glue). See **[docs/STACK.md](docs/STACK.md)** for the full setup,
+`docker-compose.yml` for the services, and `integrations/` for the connectors.
+
+```bash
+cp .env.stack.example .env.stack && ./strapi/init.sh
+docker compose --env-file .env.stack up -d --build
+python scan_daily.py && python sync_to_stack.py   # ingest, then route
+```
+
+The custom `webapp/` dashboard still works but is now optional.
+
 ## 🧠 Knowledge Brain
 
 ### Decision Tree: How data flows
