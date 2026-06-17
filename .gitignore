@@ -16,3 +16,7 @@ stack-data/
 webapp/config/
 webapp/ledger-data/
 stack_config.json
+
+# supabase self-host
+supabase/.env
+supabase/volumes/db/data/

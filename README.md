@@ -2,21 +2,28 @@
 
 > **AI-powered email accountant** — scans your Gmail inbox for receipts, invoices, payments, and financial emails. Extracts data via OCR, categorizes as personal/business, builds a year-organized ledger, generates spending insights, and produces tax-ready reports.
 
-## 🏗️ Architecture: ingestion engine → self-hosted stack
+## 🏗️ Architecture: scanner → Supabase (Postgres) → dashboard
 
-The scanner/classifier is the **ingestion engine**; its output is routed into
-mature self-hosted tools (**Paperless-ngx** for documents, **Akaunting** for
-business accounting, **Firefly III** for personal budgeting, **Strapi** as the
-orchestration glue). See **[docs/STACK.md](docs/STACK.md)** for the full setup,
-`docker-compose.yml` for the services, and `integrations/` for the connectors.
+The scanner/classifier is the **ingestion engine**; data lives in **Supabase**
+(self-hosted Postgres + auto REST API + Studio), and the `webapp/` dashboard
+reads from it. The full schema is in
+`supabase/migrations/20260615000001_full_email_accountant.sql` (validated
+against Postgres 16).
 
 ```bash
-cp .env.stack.example .env.stack && ./strapi/init.sh
-docker compose --env-file .env.stack up -d --build
-python scan_daily.py && python sync_to_stack.py   # ingest, then route
+# 1. Stand up self-hosted Supabase (schema auto-applies on first boot)
+cd supabase && cp .env.example .env   # fill in secrets — see supabase/README.md
+docker compose up -d                  # Studio + API → http://localhost:8000
+
+# 2. Point the app at it (webapp/backend env)
+#    EMAIL_ACCOUNTANT_DB=supabase  SUPABASE_URL=...  SUPABASE_SERVICE_KEY=...
 ```
 
-The custom `webapp/` dashboard still works but is now optional.
+See **[supabase/README.md](supabase/README.md)** for setup and key generation.
+
+> An alternative all-tools stack (Paperless-ngx · Akaunting · Firefly III ·
+> Strapi) also exists — see [docs/STACK.md](docs/STACK.md) — but Supabase is the
+> current direction.
 
 ## 🧠 Knowledge Brain
 

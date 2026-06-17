@@ -77,7 +77,8 @@ CREATE INDEX idx_emails_subject ON emails USING gin(to_tsvector('english', subje
 CREATE INDEX idx_emails_email_date ON emails(email_date DESC);
 CREATE INDEX idx_emails_gmail_thread ON emails(gmail_thread_id);
 CREATE INDEX idx_emails_account_status ON emails(account_id, status);
-CREATE INDEX idx_emails_date_year ON emails(EXTRACT(YEAR FROM email_date));
+-- (a plain email_date index already exists above; a functional index on
+--  EXTRACT(YEAR ...) is not allowed on Postgres because it isn't IMMUTABLE.)
 
 -- 3. EMAIL ATTACHMENTS
 CREATE TABLE attachments (
@@ -214,9 +215,15 @@ CREATE TABLE transactions (
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Partitioning by year for performance
-CREATE TABLE transactions_2025 (CHECK (EXTRACT(YEAR FROM email_date) = 2025)) INHERITS (transactions);
-CREATE TABLE transactions_2026 (CHECK (EXTRACT(YEAR FROM email_date) = 2026)) INHERITS (transactions);
+-- Optional per-year child tables (immutable date-range CHECKs). The app inserts
+-- into the parent `transactions` table; these are here only if you later want
+-- to route inserts by year.
+CREATE TABLE transactions_2025 (
+    CHECK (email_date >= '2025-01-01' AND email_date < '2026-01-01')
+) INHERITS (transactions);
+CREATE TABLE transactions_2026 (
+    CHECK (email_date >= '2026-01-01' AND email_date < '2027-01-01')
+) INHERITS (transactions);
 
 CREATE INDEX idx_transactions_email ON transactions(email_id);
 CREATE INDEX idx_transactions_domain ON transactions(domain);
