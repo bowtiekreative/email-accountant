@@ -61,6 +61,8 @@ function BarRow({
 export default function Dashboard() {
   const [year, setYear] = useState<number | undefined>(undefined);
   const [currency, setCurrency] = useState<string>("");
+  const [account, setAccount] = useState<string>("");
+  const [accounts, setAccounts] = useState<string[]>([]);
   const [data, setData] = useState<Overview | null>(null);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -68,16 +70,17 @@ export default function Dashboard() {
   useEffect(() => {
     setError(null);
     api
-      .overview(year, currency || undefined)
+      .overview(year, currency || undefined, account || undefined)
       .then((d) => {
         setData(d);
         if (!currency) setCurrency(d.active_currency);
       })
       .catch((e) => setError(String(e)));
-  }, [year, currency]);
+  }, [year, currency, account]);
 
   useEffect(() => {
     api.reminders().then(setReminders).catch(() => setReminders([]));
+    api.accountList().then(setAccounts).catch(() => setAccounts([]));
   }, []);
 
   const active = currency || data?.active_currency || "USD";
@@ -96,6 +99,20 @@ export default function Dashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
         <div className="flex items-center gap-3">
+          {accounts.length > 1 && (
+            <select
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+            >
+              <option value="">All accounts</option>
+              {accounts.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          )}
           {data && (
             <CurrencyPicker
               currencies={data.currencies}

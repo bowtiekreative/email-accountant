@@ -4,6 +4,7 @@ Daily incremental email scan — checks all 7 accounts for new financial emails.
 Scans the last 3 days, stores new emails, classifies transactions, reports.
 """
 import sys, os, json, time, imaplib, email, hashlib, re
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, '/opt/data/email-accountant')
 from datetime import datetime, timedelta
 from email.header import decode_header
@@ -16,15 +17,10 @@ YEAR = datetime.now().year
 BATCH_SIZE = 50
 DAYS_BACK = 3
 
-ACCOUNTS = [
-    ('personal', 'ryan@bowtiekreative.com', 'GMAIL_PRIMARY_PASSWORD'),
-    ('theapprentice4', 'theapprentice4@gmail.com', 'GMAIL_APPRENTICE_PASSWORD'),
-    ('digitalstemcell', 'digitalstemcell@gmail.com', 'GMAIL_DIGITALSTEMCELL_PASSWORD'),
-    ('bowtiekreative', 'bowtiekreative@gmail.com', 'GMAIL_BOWTIEKREATIVE_PASSWORD'),
-    ('k6rb1n', 'k6rb1n@gmail.com', 'GMAIL_K6RB1N_PASSWORD'),
-    ('bnelsonblog1', 'bnelsonblog1@gmail.com', 'GMAIL_BNELSONBLOG1_PASSWORD'),
-    ('hustlezonetv', 'hustlezonetv@gmail.com', 'GMAIL_HUSTLEZONETV_PASSWORD'),
-]
+# Accounts come from the shared config (~/.email-accountant/accounts.json),
+# so Gmail + IMAP accounts are managed in one place / the webapp.
+from accounts import get_accounts
+SCAN_ACCOUNTS = get_accounts(active_only=True)
 
 FINANCIAL_QUERIES = [
     'SUBJECT "receipt"', 'SUBJECT "invoice"', 'SUBJECT "payment"',
@@ -116,12 +112,12 @@ def save_attachment(email_id, part):
     return {'filename': safe, 'filepath': str(fp), 'mime_type': part.get_content_type(),
             'size_bytes': len(payload) if payload else 0, 'hash_sha256': sha}
 
-def scan_account(label, email_addr, pwd):
+def scan_account(label, email_addr, pwd, imap_host='imap.gmail.com', imap_port=993):
     """Scan one account for new financial emails in last N days."""
     since_date = (datetime.now() - timedelta(days=DAYS_BACK)).strftime('%d-%b-%Y')
-    
+
     try:
-        mail = imaplib.IMAP4_SSL('imap.gmail.com')
+        mail = imaplib.IMAP4_SSL(imap_host, imap_port)
         mail.login(email_addr, pwd)
     except Exception as e:
         return {'error': str(e), 'new_emails': 0}
@@ -284,13 +280,17 @@ total_new = 0
 total_txns = 0
 total_val = 0.0
 
-for label, email_addr, env_key in ACCOUNTS:
-    pwd = get_pwd(env_key)
+for acct in SCAN_ACCOUNTS:
+    label = acct['label']
+    email_addr = acct['email']
+    pwd = acct.get('password')
     if not pwd:
         print(f"⚠️  {label}: no password")
         continue
     try:
-        r = scan_account(label, email_addr, pwd)
+        r = scan_account(label, email_addr, pwd,
+                         acct.get('imap_host', 'imap.gmail.com'),
+                         acct.get('imap_port', 993))
         results[label] = r
         if 'error' in r:
             print(f"❌ {label}: {r['error']}")

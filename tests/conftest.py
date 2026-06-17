@@ -9,6 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "webapp" / "backend"))
 
-# Isolated, throwaway ledger directory for the whole test session.
+# Isolated, throwaway ledger directory + accounts home for the whole session.
 _TMP = tempfile.mkdtemp(prefix="ea_tests_")
 os.environ["EMAIL_ACCOUNTANT_DB_DIR"] = _TMP
+os.environ["EMAIL_ACCOUNTANT_HOME"] = tempfile.mkdtemp(prefix="ea_home_")

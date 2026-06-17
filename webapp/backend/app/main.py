@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import invest, learning, ledger, planning, reminders, scans
+from . import accounts, invest, learning, ledger, planning, reminders, scans
 from .config import FRONTEND_ORIGIN
 
 app = FastAPI(title="Email Accountant API", version="1.0.0")
@@ -35,13 +35,20 @@ def years() -> list[int]:
 
 
 @app.get("/api/overview")
-def overview(year: Optional[int] = None, currency: Optional[str] = None) -> dict[str, Any]:
-    return ledger.overview(year=year, currency=currency)
+def overview(year: Optional[int] = None, currency: Optional[str] = None,
+             account: Optional[str] = None) -> dict[str, Any]:
+    return ledger.overview(year=year, currency=currency, account=account)
 
 
 @app.get("/api/currencies")
 def currencies() -> list[str]:
     return ledger.available_currencies()
+
+
+@app.get("/api/account-list")
+def account_list() -> list[str]:
+    """Account labels that appear in the ledger (for the per-account filter)."""
+    return ledger.available_accounts()
 
 
 @app.get("/api/transactions")
@@ -53,6 +60,7 @@ def transactions(
     q: Optional[str] = None,
     needs_review: Optional[bool] = None,
     currency: Optional[str] = None,
+    account: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -64,6 +72,7 @@ def transactions(
         q=q,
         needs_review=needs_review,
         currency=currency,
+        account=account,
         limit=limit,
         offset=offset,
     )
@@ -102,6 +111,60 @@ def categories() -> list[dict[str, Any]]:
 @app.get("/api/learned-rules")
 def learned_rules() -> list[dict[str, Any]]:
     return learning.list_rules()
+
+
+# ---------------------------------------------------------------------------
+# Email accounts (Gmail + IMAP) — managed in the Accounts screen
+# ---------------------------------------------------------------------------
+
+@app.get("/api/accounts")
+def get_accounts() -> list[dict[str, Any]]:
+    return accounts.list_accounts()
+
+
+class AccountIn(BaseModel):
+    label: str
+    email: str
+    provider: str = "gmail"
+    password: Optional[str] = None
+    password_env: Optional[str] = None
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = None
+
+
+@app.post("/api/accounts")
+def add_account(payload: AccountIn) -> dict[str, Any]:
+    try:
+        return accounts.add_account(
+            label=payload.label, email=payload.email, provider=payload.provider,
+            password=payload.password, password_env=payload.password_env,
+            imap_host=payload.imap_host, imap_port=payload.imap_port,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+class AccountPatch(BaseModel):
+    email: Optional[str] = None
+    provider: Optional[str] = None
+    password: Optional[str] = None
+    password_env: Optional[str] = None
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = None
+    active: Optional[bool] = None
+
+
+@app.patch("/api/accounts/{label}")
+def update_account(label: str, payload: AccountPatch) -> dict[str, Any]:
+    try:
+        return accounts.update_account(label, **payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/accounts/{label}")
+def delete_account(label: str) -> dict[str, Any]:
+    return accounts.delete_account(label)
 
 
 @app.get("/api/reports/schedule-c")

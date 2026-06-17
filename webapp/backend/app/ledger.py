@@ -62,6 +62,25 @@ def _has_transactions_table(conn: sqlite3.Connection) -> bool:
     return row is not None
 
 
+def _account_map(conn: sqlite3.Connection) -> dict[int, str]:
+    """Map account_id -> label for a ledger DB (for per-account filtering)."""
+    has = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='email_accounts'"
+    ).fetchone()
+    if not has:
+        return {}
+    return {r["id"]: r["label"] for r in conn.execute("SELECT id, label FROM email_accounts")}
+
+
+def available_accounts() -> list[str]:
+    """Distinct account labels that appear across all ledgers."""
+    labels: set[str] = set()
+    for path in _db_files():
+        with _connect(path) as conn:
+            labels.update(_account_map(conn).values())
+    return sorted(labels)
+
+
 def available_years() -> list[int]:
     """Every tax year from START_YEAR to the current year, plus any years that
     actually have data (in case the ledger contains older or future emails).
@@ -106,6 +125,7 @@ def list_transactions(
     q: Optional[str] = None,
     needs_review: Optional[bool] = None,
     currency: Optional[str] = None,
+    account: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -142,11 +162,18 @@ def list_transactions(
             if not _has_transactions_table(conn):
                 continue
             stem = _stem(path)
+            acct_map = _account_map(conn)
             rows = conn.execute(
                 f"SELECT * FROM transactions WHERE {clause} ORDER BY email_date DESC",
                 params,
             ).fetchall()
-            results.extend(_row_to_tx(r, stem) for r in rows)
+            for r in rows:
+                tx = _row_to_tx(r, stem)
+                tx["account"] = acct_map.get(tx.get("account_id"))
+                results.append(tx)
+
+    if account:
+        results = [t for t in results if t.get("account") == account]
 
     # Dedup across the main db + year db (same email can appear in both).
     seen: dict[tuple, dict] = {}
@@ -183,14 +210,15 @@ def _totals(txs: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def overview(year: Optional[int] = None, currency: Optional[str] = None) -> dict[str, Any]:
+def overview(year: Optional[int] = None, currency: Optional[str] = None,
+             account: Optional[str] = None) -> dict[str, Any]:
     """Aggregate dashboard numbers across all ledgers for a year (or all).
 
     CAD and USD are kept separate (no FX conversion). ``totals_by_currency``
     always lists every currency; the category/merchant/trend breakdowns use the
     selected ``currency`` (or the most common one when none is given).
     """
-    all_txs = list_transactions(year=year, limit=1_000_000)
+    all_txs = list_transactions(year=year, account=account, limit=1_000_000)
     currencies = available_currencies()
 
     totals_by_currency = {

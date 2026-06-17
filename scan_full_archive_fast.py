@@ -19,14 +19,12 @@ BATCH_SIZE = 100
 SLEEP_BETWEEN_QUERIES = 0.5
 
 # ── ALL accounts ──
-ACCOUNTS = [
-    ('theapprentice4', 'theapprentice4@gmail.com', 'GMAIL_APPRENTICE_PASSWORD'),
-    ('digitalstemcell', 'digitalstemcell@gmail.com', 'GMAIL_DIGITALSTEMCELL_PASSWORD'),
-    ('bowtiekreative', 'bowtiekreative@gmail.com', 'GMAIL_BOWTIEKREATIVE_PASSWORD'),
-    ('k6rb1n', 'k6rb1n@gmail.com', 'GMAIL_K6RB1N_PASSWORD'),
-    ('bnelsonblog1', 'bnelsonblog1@gmail.com', 'GMAIL_BNELSONBLOG1_PASSWORD'),
-    ('hustlezonetv', 'hustlezonetv@gmail.com', 'GMAIL_HUSTLEZONETV_PASSWORD'),
-]
+# Accounts come from the shared config (~/.email-accountant/accounts.json) so
+# Gmail + IMAP accounts are managed in one place / the webapp. This also
+# includes the primary account that the old hardcoded list was missing.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from accounts import get_accounts
+SCAN_ACCOUNTS = get_accounts(active_only=True)
 
 FINANCIAL_QUERIES = [
     'SUBJECT "receipt"', 'SUBJECT "invoice"', 'SUBJECT "payment"',
@@ -119,21 +117,26 @@ def save_attachment(email_id, part):
     return {'filename': safe, 'filepath': str(fp), 'mime_type': part.get_content_type(),
             'size_bytes': len(payload) if payload else 0, 'hash_sha256': sha}
 
-def scan_account(label, email_addr, env_key):
+def scan_account(acct):
     """Scan one account's full archive with batch IMAP fetching."""
-    pwd = get_pwd(env_key)
+    label = acct['label']
+    email_addr = acct['email']
+    pwd = acct.get('password')
     if not pwd:
-        return {'error': 'no password in .env'}
+        return {'error': 'no password configured'}
 
     print(f"\n{'='*60}", flush=True)
     print(f"📧 FULL ARCHIVE: {email_addr} ({label})", flush=True)
     print(f"{'='*60}", flush=True)
     print(f"  Started: {datetime.now().isoformat()}", flush=True)
 
-    # ── Connect ──
-    mail = imaplib.IMAP4_SSL('imap.gmail.com')
+    # ── Connect ── (Gmail exposes all history under [Gmail]/All Mail; other
+    # IMAP providers use INBOX.)
+    mail = imaplib.IMAP4_SSL(acct.get('imap_host', 'imap.gmail.com'),
+                             acct.get('imap_port', 993))
     mail.login(email_addr, pwd)
-    mail.select('"[Gmail]/All Mail"')
+    mailbox = '"[Gmail]/All Mail"' if acct.get('provider', 'gmail') == 'gmail' else 'INBOX'
+    mail.select(mailbox)
     print(f"  ✅ Connected", flush=True)
 
     # ── Phase 1: Collect ALL unique message IDs from ALL queries ──
@@ -333,9 +336,10 @@ def scan_account(label, email_addr, env_key):
 # ── Main ──
 results_summary = {}
 
-for label, email_addr, env_key in ACCOUNTS:
+for acct in SCAN_ACCOUNTS:
+    label = acct['label']
     try:
-        results_summary[label] = scan_account(label, email_addr, env_key)
+        results_summary[label] = scan_account(acct)
     except Exception as e:
         print(f"\n  ❌ {label} FAILED: {e}", flush=True)
         import traceback

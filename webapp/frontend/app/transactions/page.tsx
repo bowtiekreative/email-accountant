@@ -21,23 +21,26 @@ export default function TransactionsPage() {
   const [type, setType] = useState("");
   const [currency, setCurrency] = useState("");
   const [currencies, setCurrencies] = useState<string[]>([]);
+  const [account, setAccount] = useState("");
+  const [accounts, setAccounts] = useState<string[]>([]);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Transaction[] | null>(null);
 
   useEffect(() => {
     api.currencies().then(setCurrencies).catch(() => setCurrencies([]));
+    api.accountList().then(setAccounts).catch(() => setAccounts([]));
   }, []);
 
   useEffect(() => {
     setRows(null);
     const t = setTimeout(() => {
       api
-        .transactions({ year, domain, type, currency, q, limit: 500 })
+        .transactions({ year, domain, type, currency, account, q, limit: 500 })
         .then(setRows)
         .catch(() => setRows([]));
     }, 200);
     return () => clearTimeout(t);
-  }, [year, domain, type, currency, q]);
+  }, [year, domain, type, currency, account, q]);
 
   return (
     <div className="space-y-5">
@@ -74,6 +77,20 @@ export default function TransactionsPage() {
             {currencies.map((c) => (
               <option key={c} value={c}>
                 {c}
+              </option>
+            ))}
+          </select>
+        )}
+        {accounts.length > 1 && (
+          <select
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+          >
+            <option value="">All accounts</option>
+            {accounts.map((a) => (
+              <option key={a} value={a}>
+                {a}
               </option>
             ))}
           </select>

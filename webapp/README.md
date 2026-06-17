@@ -67,6 +67,15 @@ python scripts/backup_ledgers.py
 pip install pytest && python -m pytest
 ```
 
+### Email accounts (Gmail + IMAP)
+
+Manage the inboxes to scan from the **Accounts** page — Gmail or any IMAP
+provider (Outlook, Yahoo, iCloud, custom). Accounts live in one shared config
+(`~/.email-accountant/accounts.json`, kept out of the repo) that both scanners
+read, so there's a single source of truth. Each account needs an **app
+password**. The dashboard and transactions list have a **per-account filter**,
+and everything still aggregates across all accounts by default.
+
 ### Currency detection
 
 Currency is detected per email (explicit CAD/USD tokens → `.ca` sender →
@@ -181,6 +190,8 @@ The data layer already supports Supabase/Postgres. Set `EMAIL_ACCOUNTANT_DB=supa
 | GET | `/api/invest/fire?annual_expense=` | Financial-independence number |
 | GET | `/api/learned-rules` | Rules learned from your edits |
 | POST | `/api/backup` | Back up all ledgers |
+| GET/POST/PATCH/DELETE | `/api/accounts` | Manage Gmail/IMAP accounts |
+| GET | `/api/account-list` | Account labels for the per-account filter |
 
 Transaction IDs are `"<ledger-file>:<rowid>"` so edits route to the correct
 year-partitioned database.

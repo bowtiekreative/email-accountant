@@ -11,6 +11,7 @@ const links = [
   { href: "/invest", label: "Invest" },
   { href: "/tax", label: "Tax" },
   { href: "/scans", label: "Scans" },
+  { href: "/accounts", label: "Accounts" },
 ];
 
 export default function Nav() {

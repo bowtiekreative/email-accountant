@@ -41,6 +41,7 @@ export type Transaction = {
   reviewed?: number;
   classification_confidence?: number;
   classification_method?: string;
+  account?: string;
 };
 
 export type TransactionPatch = {
@@ -186,6 +187,17 @@ export type WealthAdvice = {
   disclaimer: string;
 };
 
+export type EmailAccount = {
+  label: string;
+  email: string;
+  provider: string;
+  imap_host?: string;
+  imap_port?: number;
+  active: boolean;
+  has_password: boolean;
+  password_source?: string | null;
+};
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${res.status} ${path}`);
@@ -196,10 +208,12 @@ export const api = {
   base: API_BASE,
   years: () => get<number[]>("/api/years"),
   currencies: () => get<string[]>("/api/currencies"),
-  overview: (year?: number, currency?: string) => {
+  accountList: () => get<string[]>("/api/account-list"),
+  overview: (year?: number, currency?: string, account?: string) => {
     const qs = new URLSearchParams();
     if (year) qs.set("year", String(year));
     if (currency) qs.set("currency", currency);
+    if (account) qs.set("account", account);
     return get<Overview>(`/api/overview?${qs.toString()}`);
   },
   transactions: (params: Record<string, string | number | boolean | undefined>) => {
@@ -210,6 +224,35 @@ export const api = {
     return get<Transaction[]>(`/api/transactions?${qs.toString()}`);
   },
   categories: () => get<Category[]>("/api/categories"),
+  accounts: () => get<EmailAccount[]>("/api/accounts"),
+  async addAccount(payload: {
+    label: string;
+    email: string;
+    provider: string;
+    password?: string;
+    imap_host?: string;
+    imap_port?: number;
+  }) {
+    const res = await fetch(`${API_BASE}/api/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "add failed");
+    return res.json();
+  },
+  async toggleAccount(label: string, active: boolean) {
+    const res = await fetch(`${API_BASE}/api/accounts/${label}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    });
+    return res.json();
+  },
+  async deleteAccount(label: string) {
+    const res = await fetch(`${API_BASE}/api/accounts/${label}`, { method: "DELETE" });
+    return res.json();
+  },
   scheduleC: (year: number, currency = "USD") =>
     get<TaxReport>(`/api/reports/schedule-c?year=${year}&currency=${currency}`),
   t2125: (year: number, currency = "CAD") =>
