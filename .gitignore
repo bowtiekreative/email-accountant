@@ -13,3 +13,6 @@ node_modules/
 .env.stack
 strapi/app/
 stack-data/
+webapp/config/
+webapp/ledger-data/
+stack_config.json

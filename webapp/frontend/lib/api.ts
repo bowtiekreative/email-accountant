@@ -218,6 +218,25 @@ export type NetWorthSummary = {
   accounts: NetWorthAccount[];
 };
 
+export type StackService = {
+  url: string;
+  enabled: boolean;
+  has_token: boolean;
+  has_password?: boolean;
+  email?: string;
+  company_id?: string;
+  account_id?: string;
+  asset_account?: string;
+};
+
+export type StackConfig = {
+  paperless: StackService;
+  akaunting: StackService;
+  firefly: StackService;
+  strapi: StackService;
+  routing: Record<string, string>;
+};
+
 export type NetWorthProjection = {
   currency: string;
   starting_net_worth: number;
@@ -368,6 +387,27 @@ export const api = {
     const res = await fetch(`${API_BASE}/api/networth/accounts/${account_id}`, {
       method: "DELETE",
     });
+    return res.json();
+  },
+  // Stack connections
+  stackConfig: () => get<StackConfig>("/api/stack/config"),
+  async updateStackConfig(service: string, fields: Record<string, any>) {
+    const res = await fetch(`${API_BASE}/api/stack/config/${service}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) throw new Error("save failed");
+    return res.json();
+  },
+  async testStack(service: string) {
+    const res = await fetch(`${API_BASE}/api/stack/test/${service}`, { method: "POST" });
+    return res.json() as Promise<{ ok: boolean; detail: string; status_code?: number }>;
+  },
+  stackSyncStatus: () =>
+    get<{ status: string; output: string; finished_at: string | null }>("/api/stack/sync"),
+  async startStackSync(force = false) {
+    const res = await fetch(`${API_BASE}/api/stack/sync?force=${force}`, { method: "POST" });
     return res.json();
   },
   async setBudget(category: string, monthly_limit: number, currency: string) {

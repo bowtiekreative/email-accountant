@@ -11,7 +11,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import accounts, invest, learning, ledger, networth, planning, reminders, scans
+from . import (
+    accounts, invest, learning, ledger, networth, planning, reminders, scans,
+    stack_settings, stack_sync,
+)
 from .config import FRONTEND_ORIGIN
 
 app = FastAPI(title="Email Accountant API", version="1.0.0")
@@ -165,6 +168,38 @@ def update_account(label: str, payload: AccountPatch) -> dict[str, Any]:
 @app.delete("/api/accounts/{label}")
 def delete_account(label: str) -> dict[str, Any]:
     return accounts.delete_account(label)
+
+
+# ---------------------------------------------------------------------------
+# Stack connections (Paperless / Akaunting / Firefly / Strapi)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/stack/config")
+def stack_config() -> dict[str, Any]:
+    return stack_settings.public_view()
+
+
+@app.put("/api/stack/config/{service}")
+def stack_config_update(service: str, fields: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return stack_settings.update(service, fields)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/stack/test/{service}")
+def stack_test(service: str) -> dict[str, Any]:
+    return stack_settings.test(service)
+
+
+@app.get("/api/stack/sync")
+def stack_sync_status() -> dict[str, Any]:
+    return stack_sync.status()
+
+
+@app.post("/api/stack/sync")
+def stack_sync_start(force: bool = False) -> dict[str, Any]:
+    return stack_sync.start(force=force)
 
 
 @app.get("/api/reports/schedule-c")

@@ -1,11 +1,41 @@
 """Configuration for the self-hosted stack connectors.
 
-Everything is environment-driven so the same code works against local Docker
-services or remote hosts. See .env.stack.example.
+Values come from a UI-writable JSON file first
+(``$EMAIL_ACCOUNTANT_HOME/stack_config.json``), then environment variables as a
+fallback. So you can configure links/tokens in the dashboard's Connections page
+OR via .env.stack — whichever you set wins (file overrides env per-field).
 """
 
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+CONFIG_FILE = Path(
+    os.environ.get("EMAIL_ACCOUNTANT_HOME", str(Path.home() / ".email-accountant"))
+) / "stack_config.json"
+
+
+def _file() -> dict:
+    try:
+        return json.loads(CONFIG_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _val(service: str, key: str, env_key: str, default: str = "") -> str:
+    data = _file().get(service, {})
+    v = data.get(key)
+    if v not in (None, ""):
+        return str(v)
+    return os.environ.get(env_key, default)
+
+
+def _enabled(service: str, env_key: str) -> bool:
+    data = _file().get(service, {})
+    if "enabled" in data:
+        return bool(data["enabled"])
+    return os.environ.get(env_key, "true").lower() in ("1", "true", "yes")
 
 
 @dataclass
@@ -16,44 +46,55 @@ class ServiceConfig:
     extra: dict
 
 
-def _svc(prefix: str, default_url: str) -> ServiceConfig:
-    base = os.environ.get(f"{prefix}_URL", default_url).rstrip("/")
-    token = os.environ.get(f"{prefix}_TOKEN", "")
-    enabled = os.environ.get(f"{prefix}_ENABLED", "true").lower() in ("1", "true", "yes")
-    return ServiceConfig(base_url=base, token=token, enabled=enabled, extra={})
-
-
 def paperless() -> ServiceConfig:
-    return _svc("PAPERLESS", "http://localhost:8000")
+    return ServiceConfig(
+        base_url=_val("paperless", "url", "PAPERLESS_URL", "http://localhost:8080").rstrip("/"),
+        token=_val("paperless", "token", "PAPERLESS_TOKEN"),
+        enabled=_enabled("paperless", "PAPERLESS_ENABLED"),
+        extra={},
+    )
 
 
 def akaunting() -> ServiceConfig:
-    cfg = _svc("AKAUNTING", "http://localhost:8010")
-    cfg.extra["company_id"] = os.environ.get("AKAUNTING_COMPANY_ID", "1")
-    # Akaunting uses basic auth (email + password) or a token, depending on setup.
-    cfg.extra["email"] = os.environ.get("AKAUNTING_EMAIL", "")
-    cfg.extra["password"] = os.environ.get("AKAUNTING_PASSWORD", "")
-    cfg.extra["bank_account_id"] = os.environ.get("AKAUNTING_ACCOUNT_ID", "1")
-    return cfg
+    return ServiceConfig(
+        base_url=_val("akaunting", "url", "AKAUNTING_URL", "http://localhost:8010").rstrip("/"),
+        token=_val("akaunting", "token", "AKAUNTING_TOKEN"),
+        enabled=_enabled("akaunting", "AKAUNTING_ENABLED"),
+        extra={
+            "company_id": _val("akaunting", "company_id", "AKAUNTING_COMPANY_ID", "1"),
+            "email": _val("akaunting", "email", "AKAUNTING_EMAIL"),
+            "password": _val("akaunting", "password", "AKAUNTING_PASSWORD"),
+            "bank_account_id": _val("akaunting", "account_id", "AKAUNTING_ACCOUNT_ID", "1"),
+        },
+    )
 
 
 def firefly() -> ServiceConfig:
-    cfg = _svc("FIREFLY", "http://localhost:8020")
-    cfg.extra["asset_account"] = os.environ.get("FIREFLY_ASSET_ACCOUNT", "Checking account")
-    cfg.extra["revenue_account"] = os.environ.get("FIREFLY_REVENUE_ACCOUNT", "Income")
-    return cfg
+    return ServiceConfig(
+        base_url=_val("firefly", "url", "FIREFLY_URL", "http://localhost:8020").rstrip("/"),
+        token=_val("firefly", "token", "FIREFLY_TOKEN"),
+        enabled=_enabled("firefly", "FIREFLY_ENABLED"),
+        extra={
+            "asset_account": _val("firefly", "asset_account", "FIREFLY_ASSET_ACCOUNT", "Checking account"),
+            "revenue_account": _val("firefly", "revenue_account", "FIREFLY_REVENUE_ACCOUNT", "Income"),
+        },
+    )
 
 
 def strapi() -> ServiceConfig:
-    return _svc("STRAPI", "http://localhost:1337")
+    return ServiceConfig(
+        base_url=_val("strapi", "url", "STRAPI_URL", "http://localhost:1337").rstrip("/"),
+        token=_val("strapi", "token", "STRAPI_TOKEN"),
+        enabled=_enabled("strapi", "STRAPI_ENABLED"),
+        extra={},
+    )
 
 
-# How transactions route by domain. Strapi can override this at runtime.
 def routing() -> dict:
+    rules = _file().get("routing", {})
     return {
-        "business": os.environ.get("ROUTE_BUSINESS", "akaunting"),
-        "personal": os.environ.get("ROUTE_PERSONAL", "firefly"),
-        "unknown": os.environ.get("ROUTE_UNKNOWN", "firefly"),
-        # Always send attachments to Paperless when present.
-        "documents": os.environ.get("ROUTE_DOCUMENTS", "paperless"),
+        "business": rules.get("business") or os.environ.get("ROUTE_BUSINESS", "akaunting"),
+        "personal": rules.get("personal") or os.environ.get("ROUTE_PERSONAL", "firefly"),
+        "unknown": rules.get("unknown") or os.environ.get("ROUTE_UNKNOWN", "firefly"),
+        "documents": rules.get("documents") or os.environ.get("ROUTE_DOCUMENTS", "paperless"),
     }

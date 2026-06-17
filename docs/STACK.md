@@ -44,8 +44,17 @@ cp .env.stack.example .env.stack          # fill in passwords + generate secrets
 docker compose --env-file .env.stack up -d --build
 ```
 
+### Configure connections from the dashboard (no env editing)
+
+If you run the `webapp/` dashboard, open the **Connections** page to plug in
+each service's URL + API token, **Test** the connection, set **routing**
+(business→Akaunting / personal→Firefly), and hit **Sync now** — all from the
+browser. Values are saved to `$EMAIL_ACCOUNTANT_HOME/stack_config.json` (local,
+git-ignored) and the connectors read them, overriding the env vars below per
+field. Env still works as a fallback if you prefer config-as-code.
+
 Then, in each tool's UI, create an **API token** and paste it back into
-`.env.stack`:
+`.env.stack` (or the Connections page):
 
 | Tool | Where to get the token | Env var |
 |---|---|---|
