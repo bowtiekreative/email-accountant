@@ -1,0 +1,14 @@
+.git
+**/__pycache__/
+**/node_modules/
+webapp/frontend/.next/
+webapp/frontend/node_modules/
+strapi/app/
+stack-data/
+webapp/ledger-data/
+webapp/config/
+*.db
+.env
+.env.*
+.venv/
+tests/

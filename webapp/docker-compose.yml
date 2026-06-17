@@ -1,0 +1,40 @@
+# Standalone compose for JUST the dashboard (frontend + its API), to add
+# alongside your existing Paperless/Akaunting/Firefly/Strapi containers.
+#
+#   cd webapp && cp .env.example .env   # edit values
+#   docker compose up -d --build
+#
+# Build context is the repo root (..) because the API imports the scanner engine.
+# Frontend → http://<host>:3000   API → http://<host>:8000
+#
+# Frontend-only: if you already run the API elsewhere, delete the `backend`
+# service below and set NEXT_PUBLIC_API_BASE to that API's public URL.
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: webapp/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      EMAIL_ACCOUNTANT_DB_DIR: /data
+      EMAIL_ACCOUNTANT_HOME: /config
+      EMAIL_ACCOUNTANT_FRONTEND_ORIGIN: ${WEBAPP_ORIGIN:-http://localhost:3000}
+    volumes:
+      # Point LEDGER_DIR at the scanner's ledger (where email_accountant*.db live).
+      - ${LEDGER_DIR:-./ledger-data}:/data
+      - ${CONFIG_DIR:-./config}:/config
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: webapp/frontend/Dockerfile
+      args:
+        # Must be reachable from the BROWSER (baked in at build time).
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"

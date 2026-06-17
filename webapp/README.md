@@ -120,6 +120,30 @@ with the Supabase migration.
    hand. Unknown merchants get a low-confidence guess (never a confident wrong
    answer), so they surface for review rather than hiding.
 
+## Deploy on a VPS (Docker)
+
+Add the dashboard as one more container next to your existing
+Paperless/Akaunting/Firefly/Strapi stack:
+
+```bash
+cd webapp
+cp .env.example .env            # set NEXT_PUBLIC_API_BASE + LEDGER_DIR
+docker compose up -d --build
+```
+
+- **frontend** → port 3000, **backend** → port 8000 (override via `*_PORT`).
+- `NEXT_PUBLIC_API_BASE` is baked in at build time and must be reachable **from
+  the browser** — use your public domain (behind a reverse proxy) or
+  `http://YOUR_VPS_IP:8000`.
+- `LEDGER_DIR` must point at the folder holding the scanner's
+  `email_accountant*.db` files (the API reads them read-mostly).
+- **Frontend only?** If you already host the API elsewhere, delete the
+  `backend` service in `docker-compose.yml` and set `NEXT_PUBLIC_API_BASE` to
+  that API's URL.
+
+Behind a reverse proxy (Caddy/Traefik/nginx), route `/` → frontend:3000 and
+`/api` → backend:8000, then set `NEXT_PUBLIC_API_BASE=https://yourdomain/api`.
+
 ## Run it locally
 
 Requires Python 3.11+ and Node 18+.
