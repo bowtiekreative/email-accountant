@@ -2,28 +2,36 @@
 
 > **AI-powered email accountant** — scans your Gmail inbox for receipts, invoices, payments, and financial emails. Extracts data via OCR, categorizes as personal/business, builds a year-organized ledger, generates spending insights, and produces tax-ready reports.
 
-## 🏗️ Architecture: scanner → Supabase (Postgres) → dashboard
+## 🏗️ Install on a VPS — one command
 
-The scanner/classifier is the **ingestion engine**; data lives in **Supabase**
-(self-hosted Postgres + auto REST API + Studio), and the `webapp/` dashboard
-reads from it. The full schema is in
-`supabase/migrations/20260615000001_full_email_accountant.sql` (validated
-against Postgres 16).
+The root `docker-compose.yml` brings up the **whole project**: self-hosted
+Supabase (Postgres + Studio + REST/Auth/Storage API) **and** the dashboard
+(Next.js frontend + FastAPI backend), on one network with one `.env`.
 
 ```bash
-# 1. Stand up self-hosted Supabase (schema auto-applies on first boot)
-cd supabase && cp .env.example .env   # fill in secrets — see supabase/README.md
-docker compose up -d                  # Studio + API → http://localhost:8000
-
-# 2. Point the app at it (webapp/backend env)
-#    EMAIL_ACCOUNTANT_DB=supabase  SUPABASE_URL=...  SUPABASE_SERVICE_KEY=...
+cp .env.example .env          # fill in secrets — see notes below + supabase/README.md
+docker compose up -d --build
 ```
 
-See **[supabase/README.md](supabase/README.md)** for setup and key generation.
+| What | URL |
+|---|---|
+| Supabase Studio + API | `http://<host>:8000` |
+| Dashboard (Next.js) | `http://<host>:3000` |
+| API (FastAPI) | `http://<host>:8001` |
+| Postgres | `<host>:5432` |
 
-> An alternative all-tools stack (Paperless-ngx · Akaunting · Firefly III ·
-> Strapi) also exists — see [docs/STACK.md](docs/STACK.md) — but Supabase is the
-> current direction.
+The schema (`supabase/migrations/...full_email_accountant.sql`, validated on
+Postgres 16) **auto-applies on first DB boot**. Optional periodic scanner:
+`docker compose --profile scanner up -d`.
+
+**Before `up`:** generate the Supabase secrets (`JWT_SECRET`, `ANON_KEY`,
+`SERVICE_ROLE_KEY`, `SECRET_KEY_BASE`, `POSTGRES_PASSWORD`) — see
+**[supabase/README.md](supabase/README.md)** — and set `NEXT_PUBLIC_API_BASE`
+to where the **browser** reaches the API (your domain or `http://VPS_IP:8001`).
+
+> A separate all-tools stack (Paperless-ngx · Akaunting · Firefly III · Strapi)
+> also exists in `docker-compose.tools-stack.yml` — see
+> [docs/STACK.md](docs/STACK.md) — but Supabase is the current direction.
 
 ## 🧠 Knowledge Brain
 

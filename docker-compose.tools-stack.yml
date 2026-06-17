@@ -1,0 +1,172 @@
+# Self-hosted accounting stack for email-accountant.
+#
+#   Paperless-ngx  :8080  → receipt/invoice OCR + document archive
+#   Akaunting      :8010  → business accounting (income/expense/bills/clients)
+#   Firefly III    :8020  → personal budgeting / spending
+#   Strapi         :1337  → orchestration glue (unified index, routing, sync log)
+#
+# Copy .env.stack.example -> .env.stack and `docker compose --env-file .env.stack up -d`.
+# The email scanner (this repo) stays the ingestion engine; `sync_to_stack.py`
+# routes its output into these services.
+
+services:
+  # ── Paperless-ngx ──────────────────────────────────────────────────────
+  paperless-redis:
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - paperless_redis:/data
+
+  paperless-db:
+    image: docker.io/library/postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD}
+    volumes:
+      - paperless_db:/var/lib/postgresql/data
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on: [paperless-db, paperless-redis, paperless-gotenberg, paperless-tika]
+    ports:
+      - "8080:8000"
+    environment:
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASSWORD}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
+      PAPERLESS_OCR_LANGUAGE: eng
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://paperless-gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://paperless-tika:9998
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - ./stack-data/paperless/consume:/usr/src/paperless/consume
+
+  paperless-gotenberg:
+    image: docker.io/gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+
+  paperless-tika:
+    image: docker.io/apache/tika:latest
+    restart: unless-stopped
+
+  # ── Akaunting (business) ───────────────────────────────────────────────
+  akaunting-db:
+    image: docker.io/library/mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: akaunting
+      MYSQL_USER: akaunting
+      MYSQL_PASSWORD: ${AKAUNTING_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${AKAUNTING_DB_ROOT_PASSWORD}
+    volumes:
+      - akaunting_db:/var/lib/mysql
+
+  akaunting:
+    image: docker.io/akaunting/akaunting:latest
+    restart: unless-stopped
+    depends_on: [akaunting-db]
+    ports:
+      - "8010:80"
+    environment:
+      AKAUNTING_SETUP: "true"
+      DB_HOST: akaunting-db
+      DB_DATABASE: akaunting
+      DB_USERNAME: akaunting
+      DB_PASSWORD: ${AKAUNTING_DB_PASSWORD}
+      DB_PREFIX: aka_
+      APP_URL: ${AKAUNTING_URL}
+      LOCALE: en-GB
+      COMPANY_NAME: ${AKAUNTING_COMPANY_NAME}
+      COMPANY_EMAIL: ${AKAUNTING_EMAIL}
+      ADMIN_EMAIL: ${AKAUNTING_EMAIL}
+      ADMIN_PASSWORD: ${AKAUNTING_PASSWORD}
+    volumes:
+      - akaunting_data:/var/www/html
+
+  # ── Firefly III (personal) ─────────────────────────────────────────────
+  firefly-db:
+    image: docker.io/library/postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: firefly
+      POSTGRES_USER: firefly
+      POSTGRES_PASSWORD: ${FIREFLY_DB_PASSWORD}
+    volumes:
+      - firefly_db:/var/lib/postgresql/data
+
+  firefly:
+    image: docker.io/fireflyiii/core:latest
+    restart: unless-stopped
+    depends_on: [firefly-db]
+    ports:
+      - "8020:8080"
+    environment:
+      APP_KEY: ${FIREFLY_APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: firefly-db
+      DB_PORT: 5432
+      DB_DATABASE: firefly
+      DB_USERNAME: firefly
+      DB_PASSWORD: ${FIREFLY_DB_PASSWORD}
+      APP_URL: ${FIREFLY_URL}
+      TZ: America/Edmonton
+    volumes:
+      - firefly_upload:/var/www/html/storage/upload
+
+  # ── Strapi (orchestration glue) ────────────────────────────────────────
+  strapi-db:
+    image: docker.io/library/postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: strapi
+      POSTGRES_USER: strapi
+      POSTGRES_PASSWORD: ${STRAPI_DB_PASSWORD}
+    volumes:
+      - strapi_db:/var/lib/postgresql/data
+
+  strapi:
+    build: ./strapi
+    restart: unless-stopped
+    depends_on: [strapi-db]
+    ports:
+      - "1337:1337"
+    environment:
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: strapi-db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: strapi
+      DATABASE_USERNAME: strapi
+      DATABASE_PASSWORD: ${STRAPI_DB_PASSWORD}
+      APP_KEYS: ${STRAPI_APP_KEYS}
+      API_TOKEN_SALT: ${STRAPI_API_TOKEN_SALT}
+      ADMIN_JWT_SECRET: ${STRAPI_ADMIN_JWT_SECRET}
+      JWT_SECRET: ${STRAPI_JWT_SECRET}
+      TRANSFER_TOKEN_SALT: ${STRAPI_TRANSFER_TOKEN_SALT}
+    volumes:
+      - strapi_uploads:/opt/app/public/uploads
+
+volumes:
+  paperless_redis:
+  paperless_db:
+  paperless_data:
+  paperless_media:
+  akaunting_db:
+  akaunting_data:
+  firefly_db:
+  firefly_upload:
+  strapi_db:
+  strapi_uploads:

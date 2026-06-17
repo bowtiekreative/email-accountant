@@ -41,7 +41,7 @@ cp .env.stack.example .env.stack          # fill in passwords + generate secrets
 ./strapi/init.sh
 
 # 3. Bring the stack up
-docker compose --env-file .env.stack up -d --build
+docker compose -f docker-compose.tools-stack.yml --env-file .env.stack up -d --build
 ```
 
 ### Configure connections from the dashboard (no env editing)
