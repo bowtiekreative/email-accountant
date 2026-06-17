@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { api, fmt, type CompoundResult, type WealthAdvice } from "@/lib/api";
+import {
+  api,
+  fmt,
+  type CompoundResult,
+  type NetWorthAccount,
+  type NetWorthProjection,
+  type NetWorthSummary,
+  type WealthAdvice,
+} from "@/lib/api";
 import CurrencyPicker from "@/components/CurrencyPicker";
 
-type Tab = "advice" | "calculator" | "fire";
+type Tab = "networth" | "advice" | "calculator" | "fire";
 const TABS: { id: Tab; label: string }[] = [
+  { id: "networth", label: "Net Worth" },
   { id: "advice", label: "Advice" },
   { id: "calculator", label: "Growth Calculator" },
   { id: "fire", label: "Financial Independence" },
@@ -53,9 +62,250 @@ export default function InvestPage() {
         ))}
       </div>
 
+      {tab === "networth" && <NetWorthTab currency={currency} />}
       {tab === "advice" && <AdviceTab currency={currency} />}
       {tab === "calculator" && <CalculatorTab currency={currency} />}
       {tab === "fire" && <FireTab currency={currency} />}
+    </div>
+  );
+}
+
+const ASSET_CATS = [
+  ["investment", "Investments / brokerage"],
+  ["retirement", "Retirement (RRSP/TFSA/401k)"],
+  ["savings", "Savings"],
+  ["cash", "Cash / chequing"],
+  ["property", "Property / real estate"],
+  ["crypto", "Crypto"],
+  ["other_asset", "Other asset"],
+];
+const LIABILITY_CATS = [
+  ["credit_card", "Credit card"],
+  ["loan", "Loan"],
+  ["mortgage", "Mortgage"],
+  ["student_loan", "Student loan"],
+  ["other_debt", "Other debt"],
+];
+
+function NetWorthTab({ currency }: { currency: string }) {
+  const [summary, setSummary] = useState<NetWorthSummary | null>(null);
+  const [history, setHistory] = useState<{ month: string; net_worth: number }[]>([]);
+  const [proj, setProj] = useState<NetWorthProjection | null>(null);
+  const [rate, setRate] = useState(7);
+  const [years, setYears] = useState(30);
+
+  // add form
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<"asset" | "liability">("asset");
+  const [category, setCategory] = useState("investment");
+  const [balance, setBalance] = useState("");
+
+  const load = () => {
+    api.nwSummary(currency).then(setSummary).catch(() => setSummary(null));
+    api.nwHistory(currency).then(setHistory).catch(() => setHistory([]));
+    api.nwProjection(currency, rate / 100, years).then(setProj).catch(() => setProj(null));
+  };
+  useEffect(load, [currency, rate, years]);
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name) return;
+    await api.nwAddAccount({
+      name,
+      kind,
+      category,
+      currency,
+      balance: balance ? Number(balance) : undefined,
+    });
+    setName("");
+    setBalance("");
+    load();
+  }
+
+  const cats = kind === "asset" ? ASSET_CATS : LIABILITY_CATS;
+  const maxHist = Math.max(1, ...history.map((h) => Math.abs(h.net_worth)));
+
+  return (
+    <div className="space-y-6">
+      {summary && (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Assets
+            </div>
+            <div className="mt-2 text-2xl font-bold text-emerald-600">
+              {fmt(summary.assets, currency)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Liabilities
+            </div>
+            <div className="mt-2 text-2xl font-bold text-rose-600">
+              {fmt(summary.liabilities, currency)}
+            </div>
+          </div>
+          <div className="rounded-xl border-2 border-accent bg-emerald-50 p-5 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-emerald-600">
+              Net worth
+            </div>
+            <div className="mt-2 text-2xl font-bold text-ink">
+              {fmt(summary.net_worth, currency)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {history.length > 1 && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 font-semibold text-ink">Net worth over time</h2>
+          <div className="flex h-40 items-end gap-1">
+            {history.map((h) => (
+              <div
+                key={h.month}
+                className="flex-1 rounded-t bg-emerald-400"
+                style={{ height: `${(Math.abs(h.net_worth) / maxHist) * 100}%` }}
+                title={`${h.month}: ${fmt(h.net_worth, currency)}`}
+              />
+            ))}
+          </div>
+          <div className="mt-1 flex justify-between text-xs text-slate-400">
+            <span>{history[0].month}</span>
+            <span>{history[history.length - 1].month}</span>
+          </div>
+        </section>
+      )}
+
+      {proj && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 font-semibold text-ink">Projection</h2>
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              Return %/yr
+              <input
+                type="number"
+                value={rate}
+                onChange={(e) => setRate(Number(e.target.value))}
+                className="w-16 rounded border border-slate-300 px-2 py-1"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              Years
+              <input
+                type="number"
+                value={years}
+                onChange={(e) => setYears(Number(e.target.value))}
+                className="w-16 rounded border border-slate-300 px-2 py-1"
+              />
+            </label>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            Starting at <strong>{fmt(proj.starting_net_worth, currency)}</strong>, investing{" "}
+            <strong>{fmt(proj.monthly_surplus_invested, currency)}/mo</strong> of surplus
+            at {rate}% for {years} years →
+          </p>
+          <p className="mt-1 text-3xl font-bold text-emerald-600">
+            {fmt(proj.future_value, currency)}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">{proj.note}</p>
+        </section>
+      )}
+
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <h2 className="border-b border-slate-100 px-5 py-3 font-semibold text-ink">
+          Accounts ({currency})
+        </h2>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-slate-100">
+            {summary?.accounts.length === 0 && (
+              <tr>
+                <td className="px-5 py-6 text-center text-slate-400">
+                  No accounts yet — add your investments, savings, and debts below.
+                </td>
+              </tr>
+            )}
+            {summary?.accounts.map((a: NetWorthAccount) => (
+              <tr key={a.id}>
+                <td className="px-5 py-2">
+                  <span className="font-medium text-ink">{a.name}</span>
+                  <span className="ml-2 text-xs text-slate-400">{a.category}</span>
+                </td>
+                <td
+                  className={`px-5 py-2 text-right font-medium tabular-nums ${
+                    a.kind === "asset" ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {a.kind === "liability" ? "−" : ""}
+                  {fmt(a.balance, currency)}
+                </td>
+                <td className="px-5 py-2 text-right">
+                  <button
+                    onClick={() => {
+                      const v = prompt(`Update balance for ${a.name}`, String(a.balance));
+                      if (v !== null) api.nwSnapshot(a.id, Number(v)).then(load);
+                    }}
+                    className="mr-3 text-xs text-slate-500 hover:underline"
+                  >
+                    update
+                  </button>
+                  <button
+                    onClick={() =>
+                      confirm(`Remove ${a.name}?`) && api.nwDeleteAccount(a.id).then(load)
+                    }
+                    className="text-xs text-rose-600 hover:underline"
+                  >
+                    remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <form onSubmit={add} className="flex flex-wrap items-end gap-3 border-t border-slate-100 p-4">
+          <input
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+            placeholder="Account name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <select
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+            value={kind}
+            onChange={(e) => {
+              const k = e.target.value as "asset" | "liability";
+              setKind(k);
+              setCategory(k === "asset" ? "investment" : "credit_card");
+            }}
+          >
+            <option value="asset">Asset</option>
+            <option value="liability">Liability</option>
+          </select>
+          <select
+            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {cats.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <input
+            className="w-32 rounded border border-slate-300 px-3 py-1.5 text-sm"
+            placeholder="Balance"
+            type="number"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
+          >
+            Add
+          </button>
+        </form>
+      </section>
     </div>
   );
 }

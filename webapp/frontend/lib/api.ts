@@ -198,6 +198,37 @@ export type EmailAccount = {
   password_source?: string | null;
 };
 
+export type NetWorthAccount = {
+  id: number;
+  name: string;
+  kind: "asset" | "liability";
+  category: string;
+  currency: string;
+  institution?: string;
+  balance: number;
+  as_of: string | null;
+};
+
+export type NetWorthSummary = {
+  currency: string;
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+  by_category: { category: string; total: number; kind: string }[];
+  accounts: NetWorthAccount[];
+};
+
+export type NetWorthProjection = {
+  currency: string;
+  starting_net_worth: number;
+  monthly_surplus_invested: number;
+  annual_rate: number;
+  years: number;
+  future_value: number;
+  series: { year: number; balance: number; contributed: number; growth: number }[];
+  note: string;
+};
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`${res.status} ${path}`);
@@ -297,6 +328,47 @@ export const api = {
       body: JSON.stringify(input),
     });
     return res.json() as Promise<CompoundResult>;
+  },
+  // Net worth
+  nwAccounts: () => get<NetWorthAccount[]>("/api/networth/accounts"),
+  nwSummary: (currency = "USD") =>
+    get<NetWorthSummary>(`/api/networth/summary?currency=${currency}`),
+  nwHistory: (currency = "USD") =>
+    get<{ month: string; net_worth: number }[]>(
+      `/api/networth/history?currency=${currency}`
+    ),
+  nwProjection: (currency = "USD", annual_rate = 0.07, years = 30) =>
+    get<NetWorthProjection>(
+      `/api/networth/projection?currency=${currency}&annual_rate=${annual_rate}&years=${years}`
+    ),
+  async nwAddAccount(input: {
+    name: string;
+    kind: "asset" | "liability";
+    category: string;
+    currency: string;
+    balance?: number;
+  }) {
+    const res = await fetch(`${API_BASE}/api/networth/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error("add failed");
+    return res.json();
+  },
+  async nwSnapshot(account_id: number, balance: number) {
+    const res = await fetch(`${API_BASE}/api/networth/snapshots`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ account_id, balance }),
+    });
+    return res.json();
+  },
+  async nwDeleteAccount(account_id: number) {
+    const res = await fetch(`${API_BASE}/api/networth/accounts/${account_id}`, {
+      method: "DELETE",
+    });
+    return res.json();
   },
   async setBudget(category: string, monthly_limit: number, currency: string) {
     const res = await fetch(`${API_BASE}/api/budgets`, {

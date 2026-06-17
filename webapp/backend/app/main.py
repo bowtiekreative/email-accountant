@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import accounts, invest, learning, ledger, planning, reminders, scans
+from . import accounts, invest, learning, ledger, networth, planning, reminders, scans
 from .config import FRONTEND_ORIGIN
 
 app = FastAPI(title="Email Accountant API", version="1.0.0")
@@ -280,6 +280,69 @@ def invest_compound(payload: CompoundIn) -> dict[str, Any]:
 @app.get("/api/invest/fire")
 def invest_fire(annual_expense: float, withdrawal_rate: float = 0.04) -> dict[str, Any]:
     return invest.fire_number(annual_expense, withdrawal_rate)
+
+
+# ---------------------------------------------------------------------------
+# Net worth
+# ---------------------------------------------------------------------------
+
+@app.get("/api/networth/accounts")
+def networth_accounts() -> list[dict[str, Any]]:
+    return networth.list_accounts()
+
+
+class NetWorthAccountIn(BaseModel):
+    name: str
+    kind: str  # asset | liability
+    category: str = ""
+    currency: str = "USD"
+    institution: str = ""
+    balance: Optional[float] = None
+
+
+@app.post("/api/networth/accounts")
+def networth_add_account(payload: NetWorthAccountIn) -> dict[str, Any]:
+    try:
+        return networth.add_account(
+            name=payload.name, kind=payload.kind, category=payload.category,
+            currency=payload.currency, institution=payload.institution,
+            balance=payload.balance,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/networth/accounts/{account_id}")
+def networth_delete_account(account_id: int) -> dict[str, Any]:
+    networth.delete_account(account_id)
+    return {"deleted": account_id}
+
+
+class SnapshotIn(BaseModel):
+    account_id: int
+    balance: float
+    as_of: Optional[str] = None
+
+
+@app.post("/api/networth/snapshots")
+def networth_snapshot(payload: SnapshotIn) -> dict[str, Any]:
+    return networth.record_snapshot(payload.account_id, payload.balance, payload.as_of)
+
+
+@app.get("/api/networth/summary")
+def networth_summary(currency: str = "USD") -> dict[str, Any]:
+    return networth.summary(currency=currency)
+
+
+@app.get("/api/networth/history")
+def networth_history(currency: str = "USD") -> list[dict[str, Any]]:
+    return networth.history(currency=currency)
+
+
+@app.get("/api/networth/projection")
+def networth_projection(currency: str = "USD", annual_rate: float = 0.07,
+                        years: int = 30) -> dict[str, Any]:
+    return networth.projection(currency=currency, annual_rate=annual_rate, years=years)
 
 
 # ---------------------------------------------------------------------------

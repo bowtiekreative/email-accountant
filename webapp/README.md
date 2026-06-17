@@ -24,10 +24,11 @@ categorization, and the SQLite ledgers (`db/database.py`) and adds a UI + API.
     map to T2125 Part 4 line numbers, meals at the 50% limit.
   - **US Schedule C** (USD) — for US-sourced business activity.
   - **GST/HST** — taxable sales and eligible-expense bases (CAD).
-- **Invest & Build Wealth** — Buffett-style guidance from your real cashflow:
-  personalized advice (pay yourself first, kill zombie subscriptions, redirect
-  your biggest discretionary leak), a compound-growth calculator, and a
-  financial-independence (FIRE) estimator. Educational, not licensed advice.
+- **Invest & Build Wealth** — four tabs: **Net Worth** (track assets &
+  liabilities, watch net worth over time, and project it forward from your
+  monthly surplus), Buffett-style **advice** from your real cashflow, a
+  **compound-growth** calculator, and a **financial-independence (FIRE)**
+  estimator. Educational, not licensed advice.
 - **Learn from edits** — when you re-categorize a merchant in the Review queue,
   the correction is saved as a rule, applied to all past transactions from that
   merchant, and used automatically on future scans.
@@ -192,6 +193,11 @@ The data layer already supports Supabase/Postgres. Set `EMAIL_ACCOUNTANT_DB=supa
 | POST | `/api/backup` | Back up all ledgers |
 | GET/POST/PATCH/DELETE | `/api/accounts` | Manage Gmail/IMAP accounts |
 | GET | `/api/account-list` | Account labels for the per-account filter |
+| GET/POST/DELETE | `/api/networth/accounts` | Net-worth asset/liability accounts |
+| POST | `/api/networth/snapshots` | Record a balance over time |
+| GET | `/api/networth/summary` | Assets, liabilities, net worth |
+| GET | `/api/networth/history` | Net worth over time (chart) |
+| GET | `/api/networth/projection` | Project net worth forward |
 
 Transaction IDs are `"<ledger-file>:<rowid>"` so edits route to the correct
 year-partitioned database.
