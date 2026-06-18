@@ -47,11 +47,13 @@ services:
     build:
       context: .
       dockerfile: webapp/frontend/Dockerfile
-      args:
-        # Baked in at build time → must be reachable FROM THE BROWSER.
-        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8001}
+      # Empty NEXT_PUBLIC_API_BASE = same-origin: the browser calls /api/* on the
+      # frontend and the Next server proxies to the backend at runtime, so no
+      # VPS IP is baked in.
     restart: unless-stopped
     depends_on: [backend]
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 

@@ -10,9 +10,10 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY webapp/frontend/ ./
-# NEXT_PUBLIC_* is inlined at build time, so the browser must be able to reach
-# this URL. Point it at wherever the backend is published on your VPS.
-ARG NEXT_PUBLIC_API_BASE=http://localhost:8000
+# Default empty = same-origin: the browser calls /api/* and the Next server
+# proxies to the backend at runtime (BACKEND_INTERNAL_URL). This keeps the image
+# portable. Set an absolute URL here only if you want to call the API directly.
+ARG NEXT_PUBLIC_API_BASE=""
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 RUN npm run build
 

@@ -1,5 +1,8 @@
+// Empty/unset → same-origin relative calls (e.g. "/api/..."), which the Next
+// server proxies to the backend (see next.config.mjs rewrites). Set an absolute
+// URL to call the API directly instead.
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export type Bucket = { name: string; total: number; count: number };
 
@@ -255,7 +258,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  base: API_BASE,
+  base: API_BASE || "(same origin)",
   years: () => get<number[]>("/api/years"),
   currencies: () => get<string[]>("/api/currencies"),
   accountList: () => get<string[]>("/api/account-list"),

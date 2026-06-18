@@ -1,0 +1,232 @@
+# Self-contained stack for Hostinger Docker Manager ("Compose manually" or
+# "Compose from URL"). Uses PRE-BUILT images (GHCR) + inline config — no source
+# checkout, no local file mounts, no `build:`.
+#
+# 1. Set the environment variables (see docs/HOSTINGER.md) in Hostinger's env
+#    section, or replace the ${...} below with literal values.
+# 2. Deploy. Then open Supabase Studio (:8000) → SQL Editor and paste the schema
+#    from supabase/migrations/20260615000001_full_email_accountant.sql.
+#
+# Supabase Studio/API → :8000   Dashboard → :3000   API → :8001   Postgres → :5432
+
+name: email-accountant
+
+configs:
+  kong_config:
+    # ${...} is substituted by Compose at deploy time from your env vars.
+    content: |
+      _format_version: "2.1"
+      _transform: true
+      consumers:
+        - username: anon
+          keyauth_credentials:
+            - key: "${ANON_KEY}"
+        - username: service_role
+          keyauth_credentials:
+            - key: "${SERVICE_ROLE_KEY}"
+      acls:
+        - consumer: anon
+          group: anon
+        - consumer: service_role
+          group: admin
+      services:
+        - name: auth-v1
+          url: http://auth:9999/
+          routes: [{ name: auth-v1, strip_path: true, paths: ["/auth/v1/"] }]
+          plugins: [{ name: cors }]
+        - name: rest-v1
+          url: http://rest:3000/
+          routes: [{ name: rest-v1, strip_path: true, paths: ["/rest/v1/"] }]
+          plugins:
+            - { name: cors }
+            - { name: key-auth, config: { hide_credentials: true } }
+            - { name: acl, config: { hide_groups_header: true, allow: [admin, anon] } }
+        - name: realtime-v1
+          url: http://realtime:4000/socket/
+          routes: [{ name: realtime-v1, strip_path: true, paths: ["/realtime/v1/"] }]
+          plugins: [{ name: cors }]
+        - name: storage-v1
+          url: http://storage:5000/
+          routes: [{ name: storage-v1, strip_path: true, paths: ["/storage/v1/"] }]
+          plugins: [{ name: cors }]
+        - name: meta
+          url: http://meta:8080/
+          routes: [{ name: meta, strip_path: true, paths: ["/pg/"] }]
+          plugins:
+            - { name: key-auth }
+            - { name: acl, config: { hide_groups_header: true, allow: [admin] } }
+
+services:
+  db:
+    image: supabase/postgres:15.1.1.78
+    restart: unless-stopped
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    volumes: ["supabase_db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  kong:
+    image: kong:2.8.1
+    restart: unless-stopped
+    ports:
+      - "${KONG_HTTP_PORT:-8000}:8000/tcp"
+      - "${KONG_HTTPS_PORT:-8443}:8443/tcp"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    configs:
+      - source: kong_config
+        target: /home/kong/kong.yml
+    depends_on:
+      db: { condition: service_healthy }
+
+  auth:
+    image: supabase/gotrue:v2.151.0
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:8000}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+    depends_on:
+      db: { condition: service_healthy }
+
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      db: { condition: service_healthy }
+
+  realtime:
+    image: supabase/realtime:v2.30.34
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-postgres}
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+    depends_on:
+      db: { condition: service_healthy }
+
+  storage:
+    image: supabase/storage-api:v1.11.13
+    restart: unless-stopped
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes: ["supabase_storage:/var/lib/storage"]
+    depends_on:
+      db: { condition: service_healthy }
+      rest: { condition: service_started }
+
+  imgproxy:
+    image: darthsim/imgproxy:v3.8.0
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+    volumes: ["supabase_storage:/var/lib/storage"]
+
+  meta:
+    image: supabase/postgres-meta:v0.83.2
+    restart: unless-stopped
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db: { condition: service_healthy }
+
+  studio:
+    image: supabase/studio:20240729-ce42139
+    restart: unless-stopped
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_ORG:-Email Accountant}
+      DEFAULT_PROJECT_NAME: ${STUDIO_PROJECT:-email-accountant}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      meta: { condition: service_started }
+
+  # ── Dashboard (pre-built images from GHCR) ─────────────────────────────
+  backend:
+    image: ghcr.io/bowtiekreative/email-accountant-backend:latest
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      EMAIL_ACCOUNTANT_DB_DIR: /data
+      EMAIL_ACCOUNTANT_HOME: /config
+      EMAIL_ACCOUNTANT_FRONTEND_ORIGIN: ${WEBAPP_ORIGIN:-http://localhost:3000}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    volumes:
+      - ledger_data:/data
+      - config_data:/config
+    ports: ["${BACKEND_PORT:-8001}:8000"]
+
+  frontend:
+    image: ghcr.io/bowtiekreative/email-accountant-frontend:latest
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      # Same-origin /api proxied to the backend by the Next server at runtime.
+      BACKEND_INTERNAL_URL: http://backend:8000
+    ports: ["${FRONTEND_PORT:-3000}:3000"]
+
+volumes:
+  supabase_db:
+  supabase_storage:
+  ledger_data:
+  config_data:

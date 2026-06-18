@@ -26,8 +26,15 @@ Postgres 16) **auto-applies on first DB boot**. Optional periodic scanner:
 
 **Before `up`:** generate the Supabase secrets (`JWT_SECRET`, `ANON_KEY`,
 `SERVICE_ROLE_KEY`, `SECRET_KEY_BASE`, `POSTGRES_PASSWORD`) — see
-**[supabase/README.md](supabase/README.md)** — and set `NEXT_PUBLIC_API_BASE`
-to where the **browser** reaches the API (your domain or `http://VPS_IP:8001`).
+**[supabase/README.md](supabase/README.md)**.
+
+### No-terminal deploy (Hostinger Docker Manager, etc.)
+
+Use **[`docker-compose.hostinger.yml`](docker-compose.hostinger.yml)** — a
+self-contained compose that uses pre-built images (published to GHCR by
+`.github/workflows/build-images.yml`) with inline config, so it can be pasted
+into "Compose manually" or pointed at via "Compose from URL". Full walkthrough:
+**[docs/HOSTINGER.md](docs/HOSTINGER.md)**.
 
 > A separate all-tools stack (Paperless-ngx · Akaunting · Firefly III · Strapi)
 > also exists in `docker-compose.tools-stack.yml` — see
