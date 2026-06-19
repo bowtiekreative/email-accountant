@@ -8,8 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import requests
-
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -84,6 +82,8 @@ def update(svc: str, fields: dict[str, Any]) -> dict[str, Any]:
 
 def test(svc: str) -> dict[str, Any]:
     """Ping a service with its configured URL + token."""
+    import requests  # lazy: keep the core API importable even if requests is absent
+
     try:
         if svc == "paperless":
             c = stack_config.paperless()
