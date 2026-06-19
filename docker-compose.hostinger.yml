@@ -68,6 +68,10 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY:-3600}
     volumes: ["supabase_db:/var/lib/postgresql/data"]
+    configs:
+      # Fresh-volume path: also set the role passwords during first init.
+      - source: db_roles_sql
+        target: /docker-entrypoint-initdb.d/zzzz-roles.sql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 5s
