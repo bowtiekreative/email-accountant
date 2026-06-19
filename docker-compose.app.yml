@@ -1,0 +1,38 @@
+# Minimal app-only stack (frontend + backend). The dashboard uses its own
+# SQLite ledger, so no Supabase/secrets needed. Add Supabase later if you want
+# to migrate the data layer. Deploy via Compose from URL.
+name: email-accountant
+services:
+  backend:
+    image: ghcr.io/bowtiekreative/email-accountant-backend:latest
+    restart: unless-stopped
+    environment:
+      EMAIL_ACCOUNTANT_DB_DIR: /data
+      EMAIL_ACCOUNTANT_HOME: /config
+      EMAIL_ACCOUNTANT_FRONTEND_ORIGIN: ${WEBAPP_ORIGIN:-http://localhost:3000}
+    volumes: ["ledger_data:/data", "config_data:/config"]
+    ports: ["${BACKEND_PORT:-38081}:8000"]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ea-backend.rule=Host(`${BACKEND_DOMAIN:-backend-email-acccount.srv620544.hstgr.cloud}`)
+      - traefik.http.routers.ea-backend.entrypoints=websecure
+      - traefik.http.routers.ea-backend.tls.certresolver=letsencrypt
+      - traefik.http.services.ea-backend.loadbalancer.server.port=8000
+
+  frontend:
+    image: ghcr.io/bowtiekreative/email-accountant-frontend:latest
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+    ports: ["${FRONTEND_PORT:-38080}:3000"]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ea-frontend.rule=Host(`${FRONTEND_DOMAIN:-email-acccountant.srv620544.hstgr.cloud}`)
+      - traefik.http.routers.ea-frontend.entrypoints=websecure
+      - traefik.http.routers.ea-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.ea-frontend.loadbalancer.server.port=3000
+
+volumes:
+  ledger_data:
+  config_data:
