@@ -10,11 +10,13 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY webapp/frontend/ ./
-# Default empty = same-origin: the browser calls /api/* and the Next server
-# proxies to the backend at runtime (BACKEND_INTERNAL_URL). This keeps the image
-# portable. Set an absolute URL here only if you want to call the API directly.
+# The browser calls /api/* same-origin; the Next server proxies to the backend.
+# Next bakes the rewrite destination at BUILD time, so BACKEND_INTERNAL_URL must
+# be set here (the compose service is always named "backend").
 ARG NEXT_PUBLIC_API_BASE=""
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+ARG BACKEND_INTERNAL_URL=http://backend:8000
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
 RUN npm run build
 
 FROM node:20-alpine AS run
