@@ -7,13 +7,14 @@ Thin HTTP layer over the existing SQLite ledger + scan pipeline. Run with:
 
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from . import (
-    accounts, invest, learning, ledger, networth, planning, reminders, scans,
-    stack_settings, stack_sync,
+    accounts, auth, invest, learning, ledger, networth, planning, reminders,
+    scans, stack_settings, stack_sync,
 )
 from .config import FRONTEND_ORIGIN
 
@@ -25,6 +26,64 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Endpoints reachable without a session token.
+_PUBLIC_PATHS = {"/api/health", "/api/auth/login"}
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    """Gate every /api/* route behind a valid session token."""
+    path = request.url.path
+    if (
+        path.startswith("/api/")
+        and path not in _PUBLIC_PATHS
+        and request.method != "OPTIONS"
+    ):
+        token = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
+        if not auth.verify_token(token):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+def current_user(authorization: str = Header(default="")) -> str:
+    user = auth.verify_token((authorization or "").removeprefix("Bearer ").strip())
+    if not user:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    return user
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginIn) -> dict[str, Any]:
+    if not auth.verify(payload.username, payload.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {"token": auth.make_token(payload.username), "username": payload.username}
+
+
+@app.get("/api/auth/me")
+def auth_me(authorization: str = Header(default="")) -> dict[str, Any]:
+    return {"username": current_user(authorization)}
+
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@app.post("/api/auth/change-password")
+def change_password(payload: ChangePasswordIn, authorization: str = Header(default="")) -> dict[str, Any]:
+    user = current_user(authorization)
+    try:
+        if not auth.change_password(user, payload.old_password, payload.new_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"changed": True}
 
 
 @app.get("/api/health")

@@ -4,6 +4,58 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "";
 
+// ── Session token ──────────────────────────────────────────────────────────
+const TOKEN_KEY = "ea_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  // "Remember me" stores in localStorage (survives browser close); otherwise
+  // sessionStorage (cleared when the tab closes).
+  return (
+    window.localStorage.getItem(TOKEN_KEY) ||
+    window.sessionStorage.getItem(TOKEN_KEY)
+  );
+}
+export function setToken(t: string | null, remember = true) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  if (t) (remember ? window.localStorage : window.sessionStorage).setItem(TOKEN_KEY, t);
+}
+
+/** Clear all cached app data (keeps you logged in) and hard-reload. */
+export function clearCache() {
+  if (typeof window === "undefined") return;
+  const token = getToken();
+  const remembered = !!window.localStorage.getItem(TOKEN_KEY);
+  window.localStorage.clear();
+  window.sessionStorage.clear();
+  if (token) setToken(token, remembered);
+  if ("caches" in window) {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+  }
+  window.location.reload();
+}
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const t = getToken();
+  return { ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(extra || {}) };
+}
+function handle401() {
+  setToken(null);
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+// Auth-aware fetch used by all mutating calls (path is relative to API_BASE).
+async function authFetch(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: authHeaders(init.headers as Record<string, string>),
+  });
+  if (res.status === 401) handle401();
+  return res;
+}
+
 export type Bucket = { name: string; total: number; count: number };
 
 export type CurrencyTotals = {
@@ -259,13 +311,45 @@ export type NetWorthProjection = {
 };
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    headers: authHeaders(),
+  });
+  if (res.status === 401) {
+    handle401();
+    throw new Error("unauthorized");
+  }
   if (!res.ok) throw new Error(`${res.status} ${path}`);
   return res.json();
 }
 
 export const api = {
   base: API_BASE || "(same origin)",
+  // ── Auth ──
+  async login(username: string, password: string, remember = true) {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) throw new Error("Invalid username or password");
+    const data = await res.json();
+    setToken(data.token, remember);
+    return data;
+  },
+  me: () => get<{ username: string }>("/api/auth/me"),
+  logout() {
+    setToken(null);
+  },
+  async changePassword(old_password: string, new_password: string) {
+    const res = await authFetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_password, new_password }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "Change failed");
+    return res.json();
+  },
   years: () => get<number[]>("/api/years"),
   currencies: () => get<string[]>("/api/currencies"),
   accountList: () => get<string[]>("/api/account-list"),
@@ -293,7 +377,7 @@ export const api = {
   transactionDetail: (id: string) =>
     get<TransactionDetail>(`/api/transactions/${id}/detail`),
   async deleteTransactions(ids: string[]) {
-    const res = await fetch(`${API_BASE}/api/transactions/delete`, {
+    const res = await authFetch(`/api/transactions/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
@@ -301,15 +385,15 @@ export const api = {
     return res.json() as Promise<{ deleted: number }>;
   },
   async clearTransactions() {
-    const res = await fetch(`${API_BASE}/api/transactions/clear`, { method: "POST" });
+    const res = await authFetch(`/api/transactions/clear`, { method: "POST" });
     return res.json();
   },
   async reprocess() {
-    const res = await fetch(`${API_BASE}/api/transactions/reprocess`, { method: "POST" });
+    const res = await authFetch(`/api/transactions/reprocess`, { method: "POST" });
     return res.json() as Promise<{ scanned: number; updated: number }>;
   },
   async stopScan() {
-    const res = await fetch(`${API_BASE}/api/scans/stop`, { method: "POST" });
+    const res = await authFetch(`/api/scans/stop`, { method: "POST" });
     return res.json();
   },
   categories: () => get<Category[]>("/api/categories"),
@@ -322,7 +406,7 @@ export const api = {
     imap_host?: string;
     imap_port?: number;
   }) {
-    const res = await fetch(`${API_BASE}/api/accounts`, {
+    const res = await authFetch(`/api/accounts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -331,7 +415,7 @@ export const api = {
     return res.json();
   },
   async toggleAccount(label: string, active: boolean) {
-    const res = await fetch(`${API_BASE}/api/accounts/${label}`, {
+    const res = await authFetch(`/api/accounts/${label}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active }),
@@ -339,7 +423,7 @@ export const api = {
     return res.json();
   },
   async deleteAccount(label: string) {
-    const res = await fetch(`${API_BASE}/api/accounts/${label}`, { method: "DELETE" });
+    const res = await authFetch(`/api/accounts/${label}`, { method: "DELETE" });
     return res.json();
   },
   scheduleC: (year: number, currency = "USD") =>
@@ -351,7 +435,7 @@ export const api = {
   scans: () =>
     get<{ history: any[]; current: any }>("/api/scans"),
   async updateTransaction(id: string, changes: TransactionPatch) {
-    const res = await fetch(`${API_BASE}/api/transactions/${id}`, {
+    const res = await authFetch(`/api/transactions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(changes),
@@ -380,7 +464,7 @@ export const api = {
     annual_rate: number;
     years: number;
   }) {
-    const res = await fetch(`${API_BASE}/api/invest/compound`, {
+    const res = await authFetch(`/api/invest/compound`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -406,7 +490,7 @@ export const api = {
     currency: string;
     balance?: number;
   }) {
-    const res = await fetch(`${API_BASE}/api/networth/accounts`, {
+    const res = await authFetch(`/api/networth/accounts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -415,7 +499,7 @@ export const api = {
     return res.json();
   },
   async nwSnapshot(account_id: number, balance: number) {
-    const res = await fetch(`${API_BASE}/api/networth/snapshots`, {
+    const res = await authFetch(`/api/networth/snapshots`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ account_id, balance }),
@@ -423,7 +507,7 @@ export const api = {
     return res.json();
   },
   async nwDeleteAccount(account_id: number) {
-    const res = await fetch(`${API_BASE}/api/networth/accounts/${account_id}`, {
+    const res = await authFetch(`/api/networth/accounts/${account_id}`, {
       method: "DELETE",
     });
     return res.json();
@@ -431,7 +515,7 @@ export const api = {
   // Stack connections
   stackConfig: () => get<StackConfig>("/api/stack/config"),
   async updateStackConfig(service: string, fields: Record<string, any>) {
-    const res = await fetch(`${API_BASE}/api/stack/config/${service}`, {
+    const res = await authFetch(`/api/stack/config/${service}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
@@ -440,17 +524,17 @@ export const api = {
     return res.json();
   },
   async testStack(service: string) {
-    const res = await fetch(`${API_BASE}/api/stack/test/${service}`, { method: "POST" });
+    const res = await authFetch(`/api/stack/test/${service}`, { method: "POST" });
     return res.json() as Promise<{ ok: boolean; detail: string; status_code?: number }>;
   },
   stackSyncStatus: () =>
     get<{ status: string; output: string; finished_at: string | null }>("/api/stack/sync"),
   async startStackSync(force = false) {
-    const res = await fetch(`${API_BASE}/api/stack/sync?force=${force}`, { method: "POST" });
+    const res = await authFetch(`/api/stack/sync?force=${force}`, { method: "POST" });
     return res.json();
   },
   async setBudget(category: string, monthly_limit: number, currency: string) {
-    const res = await fetch(`${API_BASE}/api/budgets`, {
+    const res = await authFetch(`/api/budgets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category, monthly_limit, currency }),
@@ -465,11 +549,11 @@ export const api = {
     return res.json();
   },
   async backup() {
-    const res = await fetch(`${API_BASE}/api/backup`, { method: "POST" });
+    const res = await authFetch(`/api/backup`, { method: "POST" });
     return res.json();
   },
   async startScan(mode: "incremental" | "full" = "incremental") {
-    const res = await fetch(`${API_BASE}/api/scans?mode=${mode}`, {
+    const res = await authFetch(`/api/scans?mode=${mode}`, {
       method: "POST",
     });
     return res.json();
