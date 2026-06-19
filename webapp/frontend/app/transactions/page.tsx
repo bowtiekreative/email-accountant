@@ -384,7 +384,7 @@ function DetailModal({ id, onClose }: { id: string; onClose: () => void }) {
             <div className="grid grid-cols-2 gap-3 text-sm border-t border-slate-100 pt-3">
               <Field label="Confidence" value={t.classification_confidence ? `${(t.classification_confidence * 100).toFixed(0)}%` : '—'} />
               <Field label="Method" value={t.classification_method || '—'} />
-              <Field label="Deductible" value={t.is_deductible ? `Yes (${(t.deduction_rate * 100).toFixed(0)}%)` : 'No'} />
+              <Field label="Deductible" value={t.is_deductible ? `Yes (${((t.deduction_rate || 0) * 100).toFixed(0)}%)` : 'No'} />
               <Field label="Recurring" value={t.is_recurring ? `Yes (${t.recurring_frequency || '—'})` : 'No'} />
               <Field label="Reviewed" value={t.reviewed ? 'Yes' : 'No'} />
               <Field label="Flagged" value={t.flagged ? `Yes: ${t.flag_reason || ''}` : 'No'} />
