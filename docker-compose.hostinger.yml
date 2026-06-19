@@ -195,11 +195,9 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
     volumes: ["ledger_data:/data", "config_data:/config"]
-    networks: [default, traefik-proxy]
     ports: ["${BACKEND_PORT:-38081}:8000"]
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik-proxy
       - traefik.http.routers.ea-backend.rule=Host(`${BACKEND_DOMAIN:-backend-email-acccount.srv620544.hstgr.cloud}`)
       - traefik.http.routers.ea-backend.entrypoints=websecure
       - traefik.http.routers.ea-backend.tls.certresolver=letsencrypt
@@ -211,11 +209,9 @@ services:
     depends_on: [backend]
     environment:
       BACKEND_INTERNAL_URL: http://backend:8000
-    networks: [default, traefik-proxy]
     ports: ["${FRONTEND_PORT:-38080}:3000"]
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik-proxy
       - traefik.http.routers.ea-frontend.rule=Host(`${FRONTEND_DOMAIN:-email-acccountant.srv620544.hstgr.cloud}`)
       - traefik.http.routers.ea-frontend.entrypoints=websecure
       - traefik.http.routers.ea-frontend.tls.certresolver=letsencrypt
@@ -226,8 +222,3 @@ volumes:
   supabase_storage:
   ledger_data:
   config_data:
-
-networks:
-  default:
-  traefik-proxy:
-    external: true
