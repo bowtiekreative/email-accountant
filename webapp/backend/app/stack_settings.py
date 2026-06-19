@@ -12,7 +12,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from integrations import config as stack_config  # noqa: E402
+# The stack connectors are optional; never let a packaging gap crash the API.
+try:
+    from integrations import config as stack_config  # noqa: E402
+except Exception:  # pragma: no cover
+    stack_config = None
 
 CONFIG_DIR = Path(
     os.environ.get("EMAIL_ACCOUNTANT_HOME", str(Path.home() / ".email-accountant"))
@@ -82,6 +86,8 @@ def update(svc: str, fields: dict[str, Any]) -> dict[str, Any]:
 
 def test(svc: str) -> dict[str, Any]:
     """Ping a service with its configured URL + token."""
+    if stack_config is None:
+        return {"ok": False, "detail": "stack connectors not available in this build"}
     import requests  # lazy: keep the core API importable even if requests is absent
 
     try:

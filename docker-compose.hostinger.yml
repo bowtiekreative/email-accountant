@@ -41,6 +41,19 @@ configs:
           plugins:
             - { name: key-auth }
             - { name: acl, config: { hide_groups_header: true, allow: [admin] } }
+  db_init:
+    # Set passwords for Supabase's internal roles (the trimmed image leaves them
+    # unset). Runs only on a FRESH db volume.
+    content: |
+      DO $$
+      DECLARE r text;
+      BEGIN
+        FOREACH r IN ARRAY ARRAY['authenticator','supabase_auth_admin','supabase_storage_admin','supabase_admin','supabase_functions_admin','supabase_read_only_user','supabase_replication_admin','pgbouncer','dashboard_user'] LOOP
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+            EXECUTE format('ALTER ROLE %I WITH PASSWORD %L', r, '${POSTGRES_PASSWORD}');
+          END IF;
+        END LOOP;
+      END$$;
 
 services:
   db:
@@ -54,6 +67,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY:-3600}
     volumes: ["supabase_db:/var/lib/postgresql/data"]
+    configs:
+      - source: db_init
+        target: /docker-entrypoint-initdb.d/zzzz-roles.sql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 5s

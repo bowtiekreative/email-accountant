@@ -14,7 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY db ./db
 COPY pipeline ./pipeline
 COPY reconciliation ./reconciliation
+COPY integrations ./integrations
 COPY accounts.py ./accounts.py
+COPY sync_to_stack.py ./sync_to_stack.py
 COPY scan_daily.py scan_full_archive_fast.py ./
 COPY webapp/backend ./webapp/backend
 
