@@ -10,6 +10,7 @@ composite id of the form "<db-stem>:<rowid>" (e.g. "email_accountant_2025:42").
 
 import glob
 import os
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -105,11 +106,14 @@ def available_years() -> list[int]:
             if not _has_transactions_table(conn):
                 continue
             for row in conn.execute(
-                "SELECT DISTINCT substr(email_date,1,4) AS y FROM transactions "
+                "SELECT DISTINCT email_date FROM transactions "
                 "WHERE email_date IS NOT NULL"
             ):
-                if row["y"] and row["y"].isdigit():
-                    years.add(int(row["y"]))
+                # email_date is RFC2822 like "Wed, 17 Jun 2026 23:04:02"
+                # Extract the 4-digit year with a regex
+                m = re.search(r'\b(20\d{2})\b', row["email_date"] or "")
+                if m:
+                    years.add(int(m.group(1)))
     return sorted(years, reverse=True)
 
 
@@ -146,8 +150,10 @@ def list_transactions(
     where = ["1=1"]
     params: list[Any] = []
     if year:
-        where.append("substr(email_date,1,4) = ?")
-        params.append(str(year))
+        # email_date is RFC2822 like "Wed, 17 Jun 2026 23:04:02"
+        # Use LIKE to match the 4-digit year anywhere in the string
+        where.append("email_date LIKE ?")
+        params.append(f"% {year} %")
     if currency:
         where.append("COALESCE(NULLIF(currency,''), 'USD') = ?")
         params.append(currency)
@@ -271,7 +277,16 @@ def overview(year: Optional[int] = None, currency: Optional[str] = None,
 
     months: dict[str, dict] = {}
     for t in txs:
-        m = (t.get("email_date") or "")[:7]
+        raw_date = t.get("email_date") or ""
+        # Parse RFC2822 date like "Wed, 17 Jun 2026 23:04:02" → "2026-06"
+        m_match = re.search(r'(\d{1,2})\s+([A-Z][a-z]{2})\s+(\d{4})', raw_date)
+        if m_match:
+            month_map = {"Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
+                         "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
+                         "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"}
+            m = f"{m_match.group(3)}-{month_map.get(m_match.group(2), '01')}"
+        else:
+            m = raw_date[:7]
         if not m:
             continue
         b = months.setdefault(m, {"month": m, "income": 0.0, "expense": 0.0})

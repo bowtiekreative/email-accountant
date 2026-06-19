@@ -6,6 +6,14 @@ import YearPicker from "@/components/YearPicker";
 
 const PAGE_SIZE = 100;
 
+const fmtDate = (s?: string) => {
+  if (!s) return "—";
+  // Try parsing RFC2822 format like "Wed, 17 Jun 2026 23:04:02"
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s.slice(0, 16);
+  return d.toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "2-digit" });
+};
+
 const badge = (text?: string) => {
   const map: Record<string, string> = {
     business: "bg-indigo-100 text-indigo-700",
@@ -229,7 +237,7 @@ export default function TransactionsPage() {
                   <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
                 </td>
                 <td className="cursor-pointer whitespace-nowrap px-3 py-2 text-slate-500" onClick={() => setDetailId(t.id)}>
-                  {(t.email_date || "").slice(0, 10)}
+                  {fmtDate(t.email_date)}
                 </td>
                 <td className="cursor-pointer px-3 py-2" onClick={() => setDetailId(t.id)}>
                   <div className="font-medium text-ink">{t.merchant_name || "—"}</div>
@@ -328,18 +336,65 @@ function DetailModal({ id, onClose }: { id: string; onClose: () => void }) {
             )}
             <div>
               <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Email preview</div>
-              {email?.body_html ? (
-                <iframe
-                  title="email"
-                  sandbox=""
-                  className="h-96 w-full rounded border border-slate-200 bg-white"
-                  srcDoc={email.body_html}
-                />
-              ) : (
-                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-                  {email?.body_plain || email?.snippet || t.receipt_ocr_text || "No email body stored."}
-                </pre>
-              )}
+              {(() => {
+                const html = email?.body_html || (email?.body_plain && email.body_plain.trim().toLowerCase().startsWith('<') ? email.body_plain : '');
+                if (html) {
+                  return (
+                    <iframe
+                      title="email"
+                      sandbox=""
+                      className="h-96 w-full rounded border border-slate-200 bg-white"
+                      srcDoc={html}
+                    />
+                  );
+                }
+                return (
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                    {email?.body_plain || email?.snippet || t.receipt_ocr_text || "No email body stored."}
+                  </pre>
+                );
+              })()}
+            </div>
+            {/* Line items */}
+            {(() => {
+              try {
+                const items = typeof t.line_items === 'string' ? JSON.parse(t.line_items) : t.line_items;
+                if (Array.isArray(items) && items.length > 0) {
+                  return (
+                    <div>
+                      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Line items</div>
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {items.map((li: any, i: number) => (
+                            <tr key={i} className="border-b border-slate-100">
+                              <td className="py-1.5 text-slate-700">{li.description || li.name || '—'}</td>
+                              {li.quantity && <td className="py-1.5 text-right text-slate-500">x{li.quantity}</td>}
+                              <td className="py-1.5 text-right font-medium text-slate-800">{fmt(li.amount || li.price || 0, t.currency)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+              } catch { /* line_items not parseable */ }
+              return null;
+            })()}
+            {/* Classification details */}
+            <div className="grid grid-cols-2 gap-3 text-sm border-t border-slate-100 pt-3">
+              <Field label="Confidence" value={t.classification_confidence ? `${(t.classification_confidence * 100).toFixed(0)}%` : '—'} />
+              <Field label="Method" value={t.classification_method || '—'} />
+              <Field label="Deductible" value={t.is_deductible ? `Yes (${(t.deduction_rate * 100).toFixed(0)}%)` : 'No'} />
+              <Field label="Recurring" value={t.is_recurring ? `Yes (${t.recurring_frequency || '—'})` : 'No'} />
+              <Field label="Reviewed" value={t.reviewed ? 'Yes' : 'No'} />
+              <Field label="Flagged" value={t.flagged ? `Yes: ${t.flag_reason || ''}` : 'No'} />
+            </div>
+            {/* Email metadata */}
+            <div className="grid grid-cols-2 gap-3 text-sm border-t border-slate-100 pt-3">
+              <Field label="From" value={email?.from_email || t.email_from} />
+              <Field label="To" value={email?.to_header || '—'} />
+              <Field label="Message ID" value={email?.message_id || '—'} />
+              <Field label="SPF" value={email?.spf_status ? 'pass' : '—'} />
             </div>
           </div>
         )}

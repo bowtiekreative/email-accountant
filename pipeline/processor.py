@@ -944,9 +944,13 @@ def parse_paypal_email(subject: str, body: str) -> Optional[Dict]:
             merchant = m.group(1).strip().rstrip('.')
     
     # Try again — sometimes it's a `#` as in "Payment to Google # (googleplay)" etc.
-    m = re.search(r'[Pp]ayment to\s+(.+?)(?:\s*[.\n#]|\s*$)', body + '\n' + subject)
+    # But first strip HTML tags from body to avoid capturing tag remnants like "Google</title>"
+    clean_body = strip_html(body) if '<' in body else body
+    m = re.search(r'[Pp]ayment to\s+(.+?)(?:\s*[.\n#]|\s*$)', clean_body + '\n' + subject)
     if m:
         merchant = m.group(1).strip().rstrip('.')
+        # Clean any remaining HTML artifacts
+        merchant = re.sub(r'<[^>]+>', '', merchant).strip()
 
     # Pattern 4: "From: MERCHANT" (for received payments)
     if not merchant and is_received:
@@ -972,14 +976,35 @@ def parse_paypal_email(subject: str, body: str) -> Optional[Dict]:
     
     # Extract transaction date
     txn_date = None
-    m = re.search(r'(?:Transaction date|Date)[:\s]+([A-Z][a-z]+ \d+,? \d{4})', text)
+    # Use cleaned text for date extraction (strip HTML first)
+    clean_text = strip_html(text) if '<' in text else text
+    m = re.search(r'(?:Transaction date|Date)[:\s]+([A-Z][a-z]+ \d+,? \d{4})', clean_text)
     if m:
         try:
             from datetime import datetime as dt
             txn_date = dt.strptime(m.group(1).replace(',', ''), '%b %d %Y').isoformat()
         except:
             pass
-    
+
+    # Extract line items from PayPal receipt (item description + price pattern)
+    line_items = []
+    # Look for patterns like "Super Boost (Grindr... Qty: 1 $22.04" in cleaned text
+    clean_body = strip_html(body) if '<' in body else body
+    item_matches = re.findall(
+        r'([A-Z][A-Za-z0-9\s&\-\(\)\']+?)\s*(?:Qty:\s*\d+)?\s*\$?(\d+\.\d{2})',
+        clean_body
+    )
+    for desc, price in item_matches:
+        desc = desc.strip()
+        # Skip false positives like "Subtotal", "Total", "Transaction ID"
+        if desc.lower() in ('subtotal', 'total', 'transaction id', 'transaction date', 'merchant'):
+            continue
+        if len(desc) > 3 and float(price) > 0:
+            line_items.append({'description': desc, 'amount': float(price)})
+    # Deduplicate
+    seen = set()
+    line_items = [li for li in line_items if li['description'] not in seen and not seen.add(li['description'])]
+
     if merchant or amount:
         return {
             'merchant': merchant or 'PayPal',
@@ -987,6 +1012,7 @@ def parse_paypal_email(subject: str, body: str) -> Optional[Dict]:
             'transaction_type': tx_type,
             'source': 'paypal_email',
             'transaction_date': txn_date,
+            'line_items': line_items if line_items else None,
         }
     return None
 
@@ -1261,14 +1287,23 @@ def process_email(db, email_id: int):
     email = db.get_email(email_id)
     if not email:
         return None
-    
+
     from_email = email.get('from_email', '') or ''
     subject = email.get('subject', '') or ''
-    
+
     body_text = email.get('body_plain', '') or ''
-    if not body_text.strip():
-        html = email.get('body_html', '') or ''
-        body_text = strip_html(html)
+    body_html = email.get('body_html', '') or ''
+
+    # Many senders (PayPal, Google Play, etc.) put HTML in body_plain
+    # because they send a single text/html part with no text/plain alternative.
+    # Detect this and split properly.
+    if body_text.strip().lower().startswith(('<html', '<!doctype', '<head', '<body', '<table')):
+        # body_plain is actually HTML — move it to body_html
+        if not body_html:
+            body_html = body_text
+        body_text = strip_html(body_text)
+    elif not body_text.strip() and body_html:
+        body_text = strip_html(body_html)
     
     db.log_pipeline_step(email_id, 'extract', 'started')
     
@@ -1367,12 +1402,13 @@ def process_email(db, email_id: int):
             'email_from': from_email,
             'email_subject': subject[:200] if subject else None,
             'email_date': email.get('email_date'),
-            'merchant_name': merchant[:100] if merchant else from_email[:100],
+            'merchant_name': (re.sub(r'<[^>]+>', '', merchant[:100]).strip() if merchant else from_email[:100]),
             'merchant_email': from_email,
             'amount': round(amount, 2),
             'currency': currency,
             'transaction_date': txn_date,
             'description': subject[:500] if subject else None,
+            'line_items': json.dumps(financial.get('line_items', [])) if financial and financial.get('line_items') else '[]',
             'domain': domain,
             'transaction_type': tx_type,
             'category': category,
