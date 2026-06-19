@@ -64,6 +64,7 @@ def transactions(
     needs_review: Optional[bool] = None,
     currency: Optional[str] = None,
     account: Optional[str] = None,
+    state: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -76,9 +77,55 @@ def transactions(
         needs_review=needs_review,
         currency=currency,
         account=account,
+        state=state,
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/api/transactions/count")
+def transactions_count(
+    year: Optional[int] = None,
+    domain: Optional[str] = None,
+    type: Optional[str] = None,
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    needs_review: Optional[bool] = None,
+    currency: Optional[str] = None,
+    account: Optional[str] = None,
+    state: Optional[str] = None,
+) -> dict[str, int]:
+    return {"total": ledger.count_transactions(
+        year=year, domain=domain, tx_type=type, category=category, q=q,
+        needs_review=needs_review, currency=currency, account=account, state=state,
+    )}
+
+
+@app.get("/api/transactions/{composite_id}/detail")
+def transaction_detail(composite_id: str) -> dict[str, Any]:
+    try:
+        return ledger.transaction_detail(composite_id)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+class DeleteIn(BaseModel):
+    ids: list[str]
+
+
+@app.post("/api/transactions/delete")
+def delete_transactions(payload: DeleteIn) -> dict[str, int]:
+    return {"deleted": ledger.delete_transactions(payload.ids)}
+
+
+@app.post("/api/transactions/clear")
+def clear_transactions() -> dict[str, Any]:
+    return ledger.clear_all()
+
+
+@app.post("/api/transactions/reprocess")
+def reprocess_transactions() -> dict[str, Any]:
+    return ledger.reprocess_all()
 
 
 class TransactionUpdate(BaseModel):
@@ -95,6 +142,7 @@ class TransactionUpdate(BaseModel):
     reviewed: Optional[bool] = None
     flagged: Optional[bool] = None
     flag_reason: Optional[str] = None
+    txn_state: Optional[str] = None
 
 
 @app.patch("/api/transactions/{composite_id}")
@@ -229,6 +277,11 @@ def scan_runs() -> dict[str, Any]:
 def trigger_scan(mode: str = "incremental") -> dict[str, Any]:
     """mode=incremental (recent) or mode=full (history back to START_YEAR)."""
     return scans.start_scan(mode=mode)
+
+
+@app.post("/api/scans/stop")
+def stop_scan() -> dict[str, Any]:
+    return scans.stop_scan()
 
 
 @app.get("/api/scans/{job_id}")

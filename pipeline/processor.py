@@ -582,6 +582,33 @@ def canonical_category(category: Optional[str]) -> str:
 
 
 # ===========================================================================
+# TRANSACTION STATE — the outcome of the transaction, read from the email.
+#   paid     = successful charge/payment (default)
+#   failed   = payment/charge failed (insufficient funds, could not process)
+#   declined = card/payment declined
+#   refund   = refund / reversal / chargeback / credit
+#   pending  = authorization / processing / pending
+#   scam     = suspected scam/fraud
+# ===========================================================================
+
+def detect_state(subject: str = "", body: str = "", category: Optional[str] = None) -> str:
+    if category == 'Suspected Scam':
+        return 'scam'
+    text = f"{subject or ''} {body or ''}".lower()
+    if re.search(r'declin', text):
+        return 'declined'
+    if re.search(r'payment failed|failed payment|charge failed|insufficient funds'
+                 r'|could not (be )?process|unsuccessful|was not successful|payment error', text):
+        return 'failed'
+    if re.search(r'\brefund|reversal|charge ?back|money back|was credited|credit note', text):
+        return 'refund'
+    if re.search(r'\bpending\b|processing your|authoriz(ed|ation)|pre-?auth', text):
+        return 'pending'
+    return 'paid'
+
+
+
+# ===========================================================================
 # LEARNED RULES — corrections you make in the Review queue become rules, so the
 # same merchant is classified correctly forever after. Read from the main
 # ledger DB; written by the webapp (app/learning.py).
@@ -1349,6 +1376,7 @@ def process_email(db, email_id: int):
             'domain': domain,
             'transaction_type': tx_type,
             'category': category,
+            'txn_state': detect_state(subject, body_text, category),
             'classification_confidence': round(class_conf, 3),
             'classification_method': 'rule',
             'is_deductible': 1 if domain == 'business' and tx_type == 'expense' else 0,

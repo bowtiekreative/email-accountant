@@ -56,6 +56,13 @@ export default function ScansPage() {
           >
             Full history (2006→now)
           </button>
+          <button
+            onClick={() => api.stopScan().then(load)}
+            disabled={!running}
+            className="rounded-md border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"
+          >
+            Stop
+          </button>
         </div>
       </div>
       <p className="text-sm text-slate-500">

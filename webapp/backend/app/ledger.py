@@ -13,6 +13,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from .config import DB_DIR, START_YEAR
@@ -32,6 +33,7 @@ EDITABLE_FIELDS = {
     "reviewed",
     "flagged",
     "flag_reason",
+    "txn_state",
 }
 
 
@@ -60,6 +62,17 @@ def _has_transactions_table(conn: sqlite3.Connection) -> bool:
         "SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'"
     ).fetchone()
     return row is not None
+
+
+def _ensure_state(conn: sqlite3.Connection) -> None:
+    """Add the txn_state column to older ledgers that predate it."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(transactions)")}
+    if "txn_state" not in cols:
+        try:
+            conn.execute("ALTER TABLE transactions ADD COLUMN txn_state TEXT DEFAULT 'paid'")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 def _account_map(conn: sqlite3.Connection) -> dict[int, str]:
@@ -126,6 +139,7 @@ def list_transactions(
     needs_review: Optional[bool] = None,
     currency: Optional[str] = None,
     account: Optional[str] = None,
+    state: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -154,6 +168,9 @@ def list_transactions(
         where.append("(merchant_name LIKE ? OR email_subject LIKE ? OR description LIKE ?)")
         like = f"%{q}%"
         params.extend([like, like, like])
+    if state:
+        where.append("COALESCE(txn_state,'paid') = ?")
+        params.append(state)
 
     clause = " AND ".join(where)
     results: list[dict[str, Any]] = []
@@ -161,6 +178,7 @@ def list_transactions(
         with _connect(path) as conn:
             if not _has_transactions_table(conn):
                 continue
+            _ensure_state(conn)
             stem = _stem(path)
             acct_map = _account_map(conn)
             rows = conn.execute(
@@ -320,6 +338,123 @@ def update_transaction(
             learned = learning.learn_from_edit(merchant, safe, exclude_id=int(rowid))
     result["_learned"] = learned
     return result
+
+
+def count_transactions(**filters: Any) -> int:
+    """Total transactions matching the same filters as list_transactions."""
+    return len(list_transactions(limit=10_000_000, **filters))
+
+
+def delete_transactions(composite_ids: list[str]) -> int:
+    """Delete specific transactions by composite id (grouped per ledger file)."""
+    by_stem: dict[str, list[int]] = {}
+    for cid in composite_ids:
+        if ":" in cid:
+            stem, _, rowid = cid.partition(":")
+            by_stem.setdefault(stem, []).append(int(rowid))
+    total = 0
+    for stem, ids in by_stem.items():
+        path = os.path.join(DB_DIR, f"{stem}.db")
+        if not os.path.exists(path):
+            continue
+        with _connect(path) as conn:
+            ph = ",".join("?" * len(ids))
+            cur = conn.execute(f"DELETE FROM transactions WHERE id IN ({ph})", ids)
+            total += cur.rowcount
+            conn.commit()
+    return total
+
+
+def clear_all() -> dict[str, int]:
+    """Wipe all transactions, emails, attachments and receipts — a clean restart."""
+    counts = {"transactions": 0, "emails": 0}
+    for path in _db_files():
+        with _connect(path) as conn:
+            for table in ("transactions", "extracted_receipts", "attachments",
+                          "pipeline_logs", "monthly_summaries", "emails"):
+                try:
+                    cur = conn.execute(f"DELETE FROM {table}")
+                    if table in counts:
+                        counts[table] += cur.rowcount
+                except sqlite3.OperationalError:
+                    pass
+            conn.commit()
+    return counts
+
+
+def transaction_detail(composite_id: str) -> dict[str, Any]:
+    """Full transaction + the source email (subject, body, html) + attachments."""
+    if ":" not in composite_id:
+        raise ValueError("Invalid transaction id")
+    stem, _, rowid = composite_id.partition(":")
+    path = os.path.join(DB_DIR, f"{stem}.db")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Ledger {stem} not found")
+    with _connect(path) as conn:
+        _ensure_state(conn)
+        row = conn.execute("SELECT * FROM transactions WHERE id = ?", (int(rowid),)).fetchone()
+        if not row:
+            raise FileNotFoundError("Transaction not found")
+        tx = _row_to_tx(row, stem)
+        tx["account"] = _account_map(conn).get(tx.get("account_id"))
+        email = None
+        if tx.get("email_id"):
+            er = conn.execute("SELECT * FROM emails WHERE id = ?", (tx["email_id"],)).fetchone()
+            if er:
+                email = dict(er)
+        attachments = []
+        if tx.get("email_id"):
+            for a in conn.execute(
+                "SELECT filename, mime_type, filepath, ocr_text FROM attachments WHERE email_id = ?",
+                (tx["email_id"],),
+            ):
+                attachments.append(dict(a))
+    return {"transaction": tx, "email": email, "attachments": attachments}
+
+
+def reprocess_all(limit: int = 10_000_000) -> dict[str, Any]:
+    """Re-run classification + state detection over every stored transaction.
+
+    Uses the denormalized merchant/subject on each row, so it works without the
+    original email. Skips rows you've reviewed manually. Run this after adding
+    new categories/merchant rules so all (20k+) transactions are re-read.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from pipeline.processor import classify_merchant, detect_state, load_learned_rules
+    load_learned_rules(force=True)
+
+    changed = 0
+    scanned = 0
+    for path in _db_files():
+        with _connect(path) as conn:
+            if not _has_transactions_table(conn):
+                continue
+            _ensure_state(conn)
+            rows = conn.execute(
+                "SELECT id, merchant_name, email_subject, email_from, amount, reviewed "
+                "FROM transactions LIMIT ?", (limit,)
+            ).fetchall()
+            for r in rows:
+                scanned += 1
+                if r["reviewed"]:
+                    continue
+                merchant = r["merchant_name"] or r["email_from"] or ""
+                subject = r["email_subject"] or ""
+                domain, tx_type, category, conf = classify_merchant(
+                    merchant, subject, r["amount"] or 0, r["email_from"] or ""
+                )
+                state = detect_state(subject, "", category)
+                conn.execute(
+                    "UPDATE transactions SET domain=?, transaction_type=?, category=?, "
+                    "txn_state=?, classification_confidence=?, classification_method='reprocess', "
+                    "needs_review=? , updated_at=datetime('now') WHERE id=?",
+                    (domain, tx_type, category, state, round(conf, 3),
+                     1 if conf < 0.5 else 0, r["id"]),
+                )
+                changed += 1
+            conn.commit()
+    return {"scanned": scanned, "updated": changed}
 
 
 def list_categories() -> list[dict[str, Any]]:

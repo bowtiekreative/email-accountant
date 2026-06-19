@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     category            TEXT,
     subcategory         TEXT,
     tax_category        TEXT,
+    txn_state           TEXT DEFAULT 'paid',
     classification_confidence REAL DEFAULT 0.0,
     classification_method TEXT DEFAULT 'rule',
     is_deductible       INTEGER DEFAULT 0,

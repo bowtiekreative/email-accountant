@@ -217,7 +217,7 @@ def scan_account(acct):
     tx_count = 0
     skipped = 0
 
-    from pipeline.processor import parse_email_financial, classify_merchant
+    from pipeline.processor import parse_email_financial, classify_merchant, detect_state
 
     for i, raw in enumerate(all_raw):
         if i % 200 == 0 and i > 0:
@@ -287,6 +287,7 @@ def scan_account(acct):
                             'domain': domain,
                             'transaction_type': tx_type,
                             'category': category,
+                            'txn_state': detect_state(str(parsed.get('subject','') or ''), '', category),
                             'classification_method': 'rule',
                             'classification_confidence': conf,
                         })

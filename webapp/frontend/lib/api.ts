@@ -45,6 +45,13 @@ export type Transaction = {
   classification_confidence?: number;
   classification_method?: string;
   account?: string;
+  txn_state?: string;
+};
+
+export type TransactionDetail = {
+  transaction: Transaction & Record<string, any>;
+  email: Record<string, any> | null;
+  attachments: { filename: string; mime_type?: string; ocr_text?: string }[];
 };
 
 export type TransactionPatch = {
@@ -275,6 +282,35 @@ export const api = {
       if (v !== undefined && v !== "") qs.set(k, String(v));
     });
     return get<Transaction[]>(`/api/transactions?${qs.toString()}`);
+  },
+  transactionsCount: (params: Record<string, string | number | boolean | undefined>) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") qs.set(k, String(v));
+    });
+    return get<{ total: number }>(`/api/transactions/count?${qs.toString()}`);
+  },
+  transactionDetail: (id: string) =>
+    get<TransactionDetail>(`/api/transactions/${id}/detail`),
+  async deleteTransactions(ids: string[]) {
+    const res = await fetch(`${API_BASE}/api/transactions/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    return res.json() as Promise<{ deleted: number }>;
+  },
+  async clearTransactions() {
+    const res = await fetch(`${API_BASE}/api/transactions/clear`, { method: "POST" });
+    return res.json();
+  },
+  async reprocess() {
+    const res = await fetch(`${API_BASE}/api/transactions/reprocess`, { method: "POST" });
+    return res.json() as Promise<{ scanned: number; updated: number }>;
+  },
+  async stopScan() {
+    const res = await fetch(`${API_BASE}/api/scans/stop`, { method: "POST" });
+    return res.json();
   },
   categories: () => get<Category[]>("/api/categories"),
   accounts: () => get<EmailAccount[]>("/api/accounts"),

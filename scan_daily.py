@@ -181,7 +181,7 @@ def scan_account(label, email_addr, pwd, imap_host='imap.gmail.com', imap_port=9
     
     # Store in database
     from db.database import EmailAccountantDB, init_sqlite
-    from pipeline.processor import parse_email_financial, classify_merchant
+    from pipeline.processor import parse_email_financial, classify_merchant, detect_state
     
     init_sqlite(YEAR)
     db = EmailAccountantDB(YEAR)
@@ -254,6 +254,7 @@ def scan_account(label, email_addr, pwd, imap_host='imap.gmail.com', imap_port=9
                             'domain': domain,
                             'transaction_type': tx_type,
                             'category': category,
+                            'txn_state': detect_state(str(parsed.get('subject','') or ''), '', category),
                             'classification_method': 'rule',
                             'classification_confidence': conf,
                         })
@@ -310,7 +311,7 @@ print(f"\n{'='*50}")
 print(f"  📬 DAILY SCAN SUMMARY")
 print(f"{'='*50}")
 print(f"  Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-print(f"  Accounts checked: {len([r for r in results.values() if 'error' not in r])}/{len(ACCOUNTS)}")
+print(f"  Accounts checked: {len([r for r in results.values() if 'error' not in r])}/{len(SCAN_ACCOUNTS)}")
 print(f"  New emails:       {total_new}")
 print(f"  New transactions: {total_txns}")
 if total_txns > 0:

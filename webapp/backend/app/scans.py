@@ -15,6 +15,7 @@ from typing import Any
 from .config import FULL_SCAN_COMMAND, SCAN_COMMAND
 
 _jobs: dict[str, dict[str, Any]] = {}
+_procs: dict[str, subprocess.Popen] = {}  # job_id -> process (not JSON-returned)
 _lock = threading.Lock()
 
 # Full-history backfills can take a long time; give them a generous ceiling.
@@ -28,30 +29,55 @@ def _now() -> str:
 def _run(job_id: str) -> None:
     job = _jobs[job_id]
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             shlex.split(job["command"]),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=_TIMEOUTS.get(job["mode"], 60 * 30),
         )
-        tail = (proc.stdout or "")[-8000:]
-        err = (proc.stderr or "")[-4000:]
+        _procs[job_id] = proc
+        try:
+            out, err = proc.communicate(timeout=_TIMEOUTS.get(job["mode"], 60 * 30))
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out, err = proc.communicate()
+            with _lock:
+                job["status"] = "failed"
+                job["error"] = "Scan timed out"
+                job["finished_at"] = _now()
+            return
         with _lock:
-            job["status"] = "completed" if proc.returncode == 0 else "failed"
+            if job.get("status") == "stopped":
+                pass  # user stopped it; keep that status
+            else:
+                job["status"] = "completed" if proc.returncode == 0 else "failed"
             job["return_code"] = proc.returncode
-            job["output"] = tail
-            job["error"] = err
-            job["finished_at"] = _now()
-    except subprocess.TimeoutExpired:
-        with _lock:
-            job["status"] = "failed"
-            job["error"] = "Scan timed out"
+            job["output"] = (out or "")[-8000:]
+            job["error"] = (err or "")[-4000:]
             job["finished_at"] = _now()
     except Exception as exc:  # noqa: BLE001 - surface any launch failure to the UI
         with _lock:
             job["status"] = "failed"
             job["error"] = f"{type(exc).__name__}: {exc}"
             job["finished_at"] = _now()
+    finally:
+        _procs.pop(job_id, None)
+
+
+def stop_scan() -> dict[str, Any]:
+    """Stop the currently running scan, if any."""
+    with _lock:
+        running = [j for j in _jobs.values() if j["status"] == "running"]
+    if not running:
+        return {"stopped": False, "reason": "no scan running"}
+    job = running[0]
+    proc = _procs.get(job["id"])
+    with _lock:
+        job["status"] = "stopped"
+        job["finished_at"] = _now()
+    if proc and proc.poll() is None:
+        proc.terminate()
+    return {"stopped": True, "id": job["id"]}
 
 
 def start_scan(mode: str = "incremental") -> dict[str, Any]:
