@@ -191,7 +191,7 @@ services:
       meta: { condition: service_started }
 
   backend:
-    image: ghcr.io/bowtiekreative/email-accountant-backend:latest
+    image: ghcr.io/bowtiekreative/email-accountant-backend:cd0bcd0
     restart: *r
     depends_on: *dbh
     environment:
@@ -214,7 +214,7 @@ services:
       - traefik.http.services.ea-backend.loadbalancer.server.port=8000
 
   frontend:
-    image: ghcr.io/bowtiekreative/email-accountant-frontend:latest
+    image: ghcr.io/bowtiekreative/email-accountant-frontend:cd0bcd0
     restart: *r
     depends_on: [backend]
     environment:
