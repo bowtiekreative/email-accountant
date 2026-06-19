@@ -12,6 +12,7 @@ on:
       - "reconciliation/**"
       - "accounts.py"
       - "scan_*.py"
+      - "docker-compose.hostinger.yml"
       - ".github/workflows/build-images.yml"
   workflow_dispatch:
 
