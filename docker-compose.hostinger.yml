@@ -41,19 +41,20 @@ configs:
           plugins:
             - { name: key-auth }
             - { name: acl, config: { hide_groups_header: true, allow: [admin] } }
-  db_init:
+  db_roles_sql:
     # Set passwords for Supabase's internal roles (the trimmed image leaves them
-    # unset). Runs only on a FRESH db volume.
+    # unset). Applied every deploy by the db-roles one-shot below — no volume
+    # wipe needed. Errors for any absent role are ignored by psql.
     content: |
-      DO $$
-      DECLARE r text;
-      BEGIN
-        FOREACH r IN ARRAY ARRAY['authenticator','supabase_auth_admin','supabase_storage_admin','supabase_admin','supabase_functions_admin','supabase_read_only_user','supabase_replication_admin','pgbouncer','dashboard_user'] LOOP
-          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
-            EXECUTE format('ALTER ROLE %I WITH PASSWORD %L', r, '${POSTGRES_PASSWORD}');
-          END IF;
-        END LOOP;
-      END$$;
+      ALTER ROLE authenticator WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_auth_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_storage_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_functions_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_read_only_user WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE supabase_replication_admin WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE pgbouncer WITH PASSWORD '${POSTGRES_PASSWORD}';
+      ALTER ROLE dashboard_user WITH PASSWORD '${POSTGRES_PASSWORD}';
 
 services:
   db:
@@ -67,14 +68,23 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXP: ${JWT_EXPIRY:-3600}
     volumes: ["supabase_db:/var/lib/postgresql/data"]
-    configs:
-      - source: db_init
-        target: /docker-entrypoint-initdb.d/zzzz-roles.sql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # One-shot: set the Supabase role passwords as the postgres superuser. Runs
+  # every deploy (idempotent), so it fixes an existing volume without a wipe.
+  db-roles:
+    image: supabase/postgres:15.1.1.78
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+    configs:
+      - source: db_roles_sql
+        target: /roles.sql
+    entrypoint: ["psql", "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres", "-f", "/roles.sql"]
 
   kong:
     image: kong:2.8.1
