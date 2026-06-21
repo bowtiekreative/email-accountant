@@ -1,6 +1,7 @@
 name: build-images
 
-# Builds + deploys to Hostinger Docker Manager
+# Builds Docker images on push to main → GHCR. Watchtower on the VPS
+# auto-picks up new `latest` tags and restarts containers.
 
 on:
   push:
@@ -12,7 +13,7 @@ on:
       - "reconciliation/**"
       - "accounts.py"
       - "scan_*.py"
-      - "docker-compose.hostinger.yml"
+      - "docker-compose.cloud.yml"
       - ".github/workflows/build-images.yml"
   workflow_dispatch:
 
@@ -61,33 +62,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to Hostinger
-        uses: hostinger/deploy-on-vps@v2
-        with:
-          api-key: ${{ secrets.HOSTINGER_API_KEY }}
-          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
-          project-name: email-accountant
-          docker-compose-path: docker-compose.hostinger.yml
-          environment-variables: |
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            SECRET_KEY_BASE=${{ secrets.SECRET_KEY_BASE }}
-            ANON_KEY=${{ secrets.ANON_KEY }}
-            SERVICE_ROLE_KEY=${{ secrets.SERVICE_ROLE_KEY }}
-            API_EXTERNAL_URL=https://srv620544.hstgr.cloud:8000
-            SUPABASE_PUBLIC_URL=https://srv620544.hstgr.cloud:8000
-            SITE_URL=https://srv620544.hstgr.cloud:3000
-            WEBAPP_ORIGIN=https://srv620544.hstgr.cloud:3000
-            BACKEND_DOMAIN=backend-email-acccount.srv620544.hstgr.cloud
-            FRONTEND_DOMAIN=email-acccountant.srv620544.hstgr.cloud
-            BACKEND_PORT=38081
-            FRONTEND_PORT=38080
-            KONG_HTTP_PORT=38000
-            POSTGRES_PORT=35432
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://spssdhtcobnrascgnlct.supabase.co
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YtEXw_BCzN7LeLDpCk0dHw_Z9fQSPl9
+            BACKEND_INTERNAL_URL=http://backend:8000
