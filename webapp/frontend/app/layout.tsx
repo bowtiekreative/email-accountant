@@ -1,22 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Nav from "@/components/Nav";
 import AuthGate from "@/components/AuthGate";
 
 export const metadata: Metadata = {
-  title: "Email Accountant",
-  description: "Personal AI email accountant dashboard",
+  title: "Ledger — by Bow Tie Kreative",
+  description:
+    "Ledger lets your inbox do the bookkeeping — it scans your email for receipts and invoices, then sorts every expense for you.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <AuthGate nav={<Nav />}>{children}</AuthGate>
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

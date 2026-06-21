@@ -1,11 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Ledger — by Bow Tie Kreative
+   Design tokens (warm low-stimulation canvas, violet brand).
+   ============================================================ */
 :root {
   color-scheme: light;
+
+  /* ---- Warm neutral canvas ---- */
+  --canvas: #FAF8F4;
+  --surface: #FFFFFF;
+  --surface-sunken: #F2EFE8;
+  --overlay: rgba(27, 26, 34, 0.48);
+
+  /* ---- Ink ---- */
+  --ink-900: #1B1A22;
+  --ink-800: #2A2834;
+  --ink-700: #3B3947;
+  --ink-600: #514F5F;
+  --ink-500: #6A6878;
+  --ink-400: #8A8794;
+  --ink-300: #A7A4B2;
+
+  /* ---- Hairlines ---- */
+  --line: #EAE6DE;
+  --line-strong: #D9D3C8;
+  --line-faint: #F1EDE6;
+
+  /* ---- Violet (brand) ---- */
+  --violet-700: #4F31D6;
+  --violet-600: #6442EE;
+  --violet-500: #7C5CF6;
+  --violet-100: #EBE6FE;
+  --violet-50:  #F5F2FE;
+
+  /* ---- Coral ---- */
+  --coral-700: #D62E58;
+  --coral-600: #F0436B;
+  --coral-500: #FB6F92;
+  --coral-100: #FFE2EA;
+  --coral-50:  #FFF1F4;
+
+  /* ---- Teal ---- */
+  --teal-700: #0B7E74;
+  --teal-600: #0E9C90;
+  --teal-500: #16B7A8;
+  --teal-100: #D2F3EF;
+  --teal-50:  #ECFAF8;
+
+  /* ---- Amber ---- */
+  --amber-700: #B86A0C;
+  --amber-600: #D98512;
+  --amber-500: #F5A524;
+  --amber-100: #FCEDCF;
+  --amber-50:  #FEF7E8;
+
+  /* ---- Sky ---- */
+  --sky-700: #195FBC;
+  --sky-600: #1F73E0;
+  --sky-500: #2E8CF6;
+  --sky-100: #DAEAFE;
+  --sky-50:  #EEF5FE;
+
+  /* ---- Lime ---- */
+  --lime-700: #497B0E;
+  --lime-600: #5C9A12;
+  --lime-500: #7DBF24;
+  --lime-100: #E6F3CF;
+  --lime-50:  #F4FAE8;
+
+  /* ---- Semantic ---- */
+  --success-600: #128A5E;
+  --success-500: #1FA971;
+  --success-100: #D5F0E3;
+  --warning-600: #D98512;
+  --warning-500: #F5A524;
+  --warning-100: #FCEDCF;
+  --danger-600:  #D03036;
+  --danger-500:  #E5484D;
+  --danger-100:  #FBDDDE;
+  --info-600:    #1F73E0;
+  --info-100:    #DAEAFE;
+
+  /* ---- Fonts ---- */
+  --font-display: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Lexend', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Space Grotesk', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ---- Radius ---- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  /* ---- Spacing helpers ---- */
+  --gutter: 1.5rem;
+
+  /* ---- Shadows ---- */
+  --shadow-xs: 0 1px 2px rgba(27, 26, 34, 0.04);
+  --shadow-sm: 0 1px 3px rgba(27, 26, 34, 0.05), 0 1px 2px rgba(27, 26, 34, 0.04);
+  --shadow-md: 0 4px 16px rgba(27, 26, 34, 0.06), 0 2px 6px rgba(27, 26, 34, 0.04);
+  --shadow-lg: 0 12px 34px rgba(27, 26, 34, 0.08), 0 4px 12px rgba(27, 26, 34, 0.05);
+  --shadow-xl: 0 24px 60px rgba(27, 26, 34, 0.10), 0 8px 24px rgba(27, 26, 34, 0.06);
+  --shadow-brand: 0 8px 24px rgba(100, 66, 238, 0.28);
+  --elevation-hairline: inset 0 0 0 1px var(--line), var(--shadow-xs);
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  background: var(--canvas);
+  color: var(--ink-700);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
 }
+
+/* Scrollbars to match the warm canvas */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: #e2ddd3;
+  border-radius: 99px;
+  border: 3px solid var(--canvas);
+}
+::-webkit-scrollbar-thumb:hover { background: #d4cdbf; }
+
+/* Animations used across the app */
+@keyframes lg-spin { to { transform: rotate(360deg); } }
+@keyframes lg-toast {
+  from { transform: translateY(14px) translateX(-50%); opacity: 0; }
+  to   { transform: translateY(0) translateX(-50%); opacity: 1; }
+}
+@keyframes lg-pop {
+  0%   { transform: scale(.7); opacity: 0; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes lg-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@keyframes lg-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lg-fade-up { animation: lg-fade-up .32s cubic-bezier(0.16, 1, 0.3, 1) both; }

@@ -1,6 +1,34 @@
-# 📬 Email Accountant
+# Ledger — by Bow Tie Kreative
 
-> **AI-powered email accountant** — scans your Gmail inbox for receipts, invoices, payments, and financial emails. Extracts data via OCR, categorizes as personal/business, builds a year-organized ledger, generates spending insights, and produces tax-ready reports.
+> **Let your inbox do the bookkeeping.** Ledger scans your email for receipts
+> and invoices, then sorts every expense for you — calm, clear, and made for
+> every kind of brain. It extracts data via OCR, categorizes personal vs.
+> business, builds a year-organized ledger, surfaces spending insights, answers
+> questions with an AI assistant, and produces tax-ready reports.
+
+The dashboard is a warm, low-stimulation web app (the **Ledger** design system:
+violet accent on a warm canvas, Outfit/Lexend/Space Grotesk type) with screens
+for the receipt **Gallery**, **Transactions**, **Insights**, **Categories**,
+**Investments**, **Advice**, **Ask AI**, **Reports**, and **Settings**.
+
+### Auth & data — cloud Supabase
+
+- **Authentication:** the frontend signs in with **Supabase Auth** (Google +
+  email/password); the backend verifies each request's access-token JWT against
+  the project's published keys (`SUPABASE_JWKS_URL`). Configure
+  `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (frontend)
+  and `SUPABASE_URL` / `SUPABASE_JWKS_URL` (backend). See
+  `webapp/frontend/.env.local.example` and `webapp/backend/env.sample`.
+- **Ask AI:** set `ANTHROPIC_API_KEY` on the backend to enable the spending
+  assistant (defaults to `claude-sonnet-4-6`).
+- The scanner's data engine (`db/database.py`) can write to cloud Postgres via
+  `SUPABASE_SECRET_KEY` (new `sb_secret_…` keys supported). The dashboard's
+  read layer still reads the year-partitioned SQLite ledgers; porting those
+  reads to Postgres is a tracked follow-up.
+
+---
+
+## Legacy install notes
 
 ## 🏗️ Install on a VPS — one command
 

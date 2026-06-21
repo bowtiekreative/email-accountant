@@ -1,271 +1,371 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { api, fmt, type Overview, type Reminder } from "@/lib/api";
-import YearPicker from "@/components/YearPicker";
-import CurrencyPicker from "@/components/CurrencyPicker";
+import {
+  Icon,
+  BentoTile,
+  Chip,
+  EmptyState,
+  PageState,
+  categoryStyle,
+  accent,
+  type Accent,
+  type IconName,
+} from "@/lib/ui";
+import { PageHeader, HeaderSearch } from "@/components/PageHeader";
+import { api, fmt, type Overview, type Transaction } from "@/lib/api";
 
-function Stat({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "good" | "bad" | "warn";
-}) {
-  const toneCls = {
-    default: "text-ink",
-    good: "text-emerald-600",
-    bad: "text-rose-600",
-    warn: "text-amber-600",
-  }[tone];
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </div>
-      <div className={`mt-2 text-2xl font-bold ${toneCls}`}>{value}</div>
-    </div>
-  );
-}
+export default function GalleryPage() {
+  const year = new Date().getFullYear();
+  const currency = "USD";
 
-function BarRow({
-  name,
-  total,
-  max,
-  currency,
-}: {
-  name: string;
-  total: number;
-  max: number;
-  currency: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 py-1.5 text-sm">
-      <div className="w-40 shrink-0 truncate text-slate-600">{name}</div>
-      <div className="flex-1">
-        <div
-          className="h-5 rounded bg-emerald-100"
-          style={{ width: `${max ? (total / max) * 100 : 0}%`, minWidth: "2px" }}
-        />
-      </div>
-      <div className="w-28 shrink-0 text-right font-medium tabular-nums">
-        {fmt(total, currency)}
-      </div>
-    </div>
-  );
-}
-
-export default function Dashboard() {
-  const [year, setYear] = useState<number | undefined>(undefined);
-  const [currency, setCurrency] = useState<string>("");
-  const [account, setAccount] = useState<string>("");
-  const [accounts, setAccounts] = useState<string[]>([]);
-  const [data, setData] = useState<Overview | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [txns, setTxns] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [q, setQ] = useState("");
+  const [activeCat, setActiveCat] = useState<string>("__all__");
+
+  async function load() {
+    setLoading(true);
     setError(null);
-    api
-      .overview(year, currency || undefined, account || undefined)
-      .then((d) => {
-        setData(d);
-        if (!currency) setCurrency(d.active_currency);
-      })
-      .catch((e) => setError(String(e)));
-  }, [year, currency, account]);
+    try {
+      const [ov, tx] = await Promise.all([
+        api.overview(year, currency),
+        api.transactions({ year, currency, q, limit: 60 }),
+      ]);
+      setOverview(ov);
+      setTxns(tx);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load receipts");
+    } finally {
+      setLoading(false);
+    }
+  }
 
+  // Initial load + re-fetch when the header search query changes.
   useEffect(() => {
-    api.reminders().then(setReminders).catch(() => setReminders([]));
-    api.accountList().then(setAccounts).catch(() => setAccounts([]));
-  }, []);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [ov, tx] = await Promise.all([
+          api.overview(year, currency),
+          api.transactions({ year, currency, q, limit: 60 }),
+        ]);
+        if (cancelled) return;
+        setOverview(ov);
+        setTxns(tx);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Failed to load receipts");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
-  const active = currency || data?.active_currency || "USD";
-  const totals = data?.totals_by_currency[active];
-  const others =
-    data?.currencies.filter((c) => c !== active) ?? [];
+  const totals = overview?.totals_by_currency?.[currency];
 
-  const maxMonth = data
-    ? Math.max(1, ...data.monthly_trend.map((m) => Math.max(m.income, m.expense)))
-    : 1;
-  const maxCat = data ? Math.max(1, ...data.by_category.map((c) => c.total)) : 1;
-  const maxMerch = data ? Math.max(1, ...data.by_merchant.map((c) => c.total)) : 1;
+  // Distinct categories present in the loaded receipts → filter chips.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    txns.forEach((t) => {
+      if (t.category) set.add(t.category);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [txns]);
+
+  // Client-side filter by selected chip + header search (vendor or category).
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return txns.filter((t) => {
+      if (activeCat !== "__all__" && t.category !== activeCat) return false;
+      if (!needle) return true;
+      const vendor = (t.merchant_name || "").toLowerCase();
+      const cat = (t.category || "").toLowerCase();
+      return vendor.includes(needle) || cat.includes(needle);
+    });
+  }, [txns, activeCat, q]);
+
+  const topCategory = overview?.by_category?.[0];
+  const topStyle = categoryStyle(topCategory?.name);
+
+  const monthYear = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const stats: {
+    accent: Accent;
+    icon: IconName;
+    value: string;
+    label: string;
+  }[] = [
+    {
+      accent: "amber",
+      icon: "wallet",
+      value: fmt(totals?.expense, currency),
+      label: "Spent this month",
+    },
+    {
+      accent: "violet",
+      icon: "mail",
+      value: String(totals?.transaction_count ?? 0),
+      label: "Receipts captured",
+    },
+    {
+      accent: "coral",
+      icon: "clock",
+      value: String(overview?.needs_review ?? 0),
+      label: "Pending review",
+    },
+    {
+      accent: topCategory ? topStyle.accent : "sky",
+      icon: topCategory ? topStyle.icon : "utensils",
+      value: topCategory?.name || "—",
+      label: "Top category",
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-ink">Dashboard</h1>
-        <div className="flex items-center gap-3">
-          {accounts.length > 1 && (
-            <select
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm"
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
+    <>
+      <PageHeader
+        title="Receipt gallery"
+        subtitle={`${filtered.length} receipts found in your inbox · ${monthYear}`}
+        showScan
+        onScanned={load}
+      >
+        <HeaderSearch value={q} onChange={setQ} />
+      </PageHeader>
+
+      <div className="px-8 py-7 pb-16 lg-fade-up">
+        <PageState loading={loading} error={error}>
+          {/* Bento stat tiles */}
+          <div className="mb-[30px] grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            {stats.map((s, i) => (
+              <BentoTile key={i} accent={s.accent} icon={s.icon}>
+                <div className="mt-auto flex flex-col gap-px">
+                  <span
+                    className="font-mono font-semibold text-ink-900"
+                    style={{
+                      fontSize: 29,
+                      lineHeight: 1.05,
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {s.value}
+                  </span>
+                  <span className="text-[12.5px] font-medium text-ink-600">
+                    {s.label}
+                  </span>
+                </div>
+              </BentoTile>
+            ))}
+          </div>
+
+          {/* Category filter chips */}
+          <div className="mb-[22px] flex flex-wrap items-center gap-[9px]">
+            <Chip
+              active={activeCat === "__all__"}
+              onClick={() => setActiveCat("__all__")}
             >
-              <option value="">All accounts</option>
-              {accounts.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          )}
-          {data && (
-            <CurrencyPicker
-              currencies={data.currencies}
-              value={active}
-              onChange={setCurrency}
+              All receipts
+            </Chip>
+            {categories.map((cat) => {
+              const cs = categoryStyle(cat);
+              return (
+                <Chip
+                  key={cat}
+                  icon={cs.icon}
+                  active={activeCat === cat}
+                  onClick={() => setActiveCat(cat)}
+                >
+                  {cat}
+                </Chip>
+              );
+            })}
+          </div>
+
+          {/* Receipt cards grid */}
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title="No receipts match that"
+              body="Try a different vendor name, or clear your filters to see everything in your inbox."
             />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((t) => (
+                <ReceiptCard key={t.id} t={t} />
+              ))}
+            </div>
           )}
-          <YearPicker value={year} onChange={setYear} />
+        </PageState>
+      </div>
+    </>
+  );
+}
+
+function ReceiptCard({ t }: { t: Transaction }) {
+  const cs = categoryStyle(t.category);
+  const color = accent(cs.accent);
+  const vendor = t.merchant_name || "Unknown vendor";
+  const reviewed = !!t.reviewed || !t.needs_review;
+  const amountLabel = fmt(t.amount, t.currency);
+  const date = t.email_date
+    ? new Date(t.email_date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
+
+  return (
+    <Link
+      href={`/transactions/${t.id}`}
+      className="group flex min-h-[236px] flex-col overflow-hidden rounded-[18px] border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:border-line-strong hover:shadow-lg"
+    >
+      {/* Sunken preview area */}
+      <div className="relative flex flex-1 items-center justify-center bg-surface-sunken p-[18px]">
+        {/* Category icon chip */}
+        <span
+          className="absolute left-3 top-3 flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-white"
+          style={{ color, boxShadow: "var(--shadow-xs)" }}
+        >
+          <Icon name={cs.icon} size={16} />
+        </span>
+
+        {/* Reviewed status badge */}
+        {reviewed && (
+          <span
+            className="absolute right-3 top-3 flex h-[30px] w-[30px] items-center justify-center rounded-pill text-white"
+            style={{
+              background: "var(--success-500)",
+              boxShadow: "var(--shadow-xs)",
+            }}
+          >
+            <Icon name="check" size={16} />
+          </span>
+        )}
+
+        {/* Paper receipt mock */}
+        <div
+          className="relative w-full max-w-[188px] bg-white"
+          style={{
+            borderRadius: "10px 10px 3px 3px",
+            boxShadow:
+              "0 6px 18px -8px rgba(27,26,34,.22),0 1px 0 rgba(27,26,34,.04)",
+          }}
+        >
+          <div
+            style={{
+              height: 4,
+              background: color,
+              borderRadius: "10px 10px 0 0",
+              opacity: 0.9,
+            }}
+          />
+          <div className="px-[15px] pb-1 pt-[13px]">
+            <div className="truncate text-center font-mono text-[11px] font-semibold uppercase tracking-[0.02em] text-ink-900">
+              {vendor}
+            </div>
+            <div
+              className="my-[9px] mb-[11px] h-px"
+              style={{
+                background:
+                  "repeating-linear-gradient(90deg,var(--line-strong) 0 4px,transparent 4px 8px)",
+              }}
+            />
+            <div className="flex flex-col gap-[7px]">
+              <ReceiptLine wA="54%" wB="20%" dark />
+              <ReceiptLine wA="40%" wB="16%" />
+              <ReceiptLine wA="46%" wB="18%" />
+            </div>
+            <div
+              className="my-[11px] h-px"
+              style={{
+                background:
+                  "repeating-linear-gradient(90deg,var(--line-strong) 0 4px,transparent 4px 8px)",
+              }}
+            />
+            <div className="flex items-baseline justify-between">
+              <span className="font-mono text-[9.5px] font-bold tracking-[0.12em] text-ink-500">
+                TOTAL
+              </span>
+              <span className="font-mono text-[14px] font-bold text-ink-900">
+                {amountLabel}
+              </span>
+            </div>
+          </div>
+          {/* Torn bottom edge */}
+          <div
+            style={{
+              height: 9,
+              background: "#fff",
+              WebkitMaskImage:
+                "linear-gradient(45deg,#000 50%,transparent 51%),linear-gradient(-45deg,#000 50%,transparent 51%)",
+              WebkitMaskSize: "11px 11px",
+              WebkitMaskRepeat: "repeat-x",
+              WebkitMaskPosition: "bottom",
+              maskImage:
+                "linear-gradient(45deg,#000 50%,transparent 51%),linear-gradient(-45deg,#000 50%,transparent 51%)",
+              maskSize: "11px 11px",
+              maskRepeat: "repeat-x",
+              maskPosition: "bottom",
+            }}
+          />
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          Could not reach the API at <code>{api.base}</code>. Is the backend
-          running? ({error})
-        </div>
-      )}
-
-      {reminders.length > 0 && (
-        <div className="space-y-2">
-          {reminders.slice(0, 3).map((r, i) => (
-            <Link
-              key={i}
-              href="/planning"
-              className={`block rounded-lg border px-4 py-2 text-sm transition hover:opacity-90 ${
-                r.severity === "high"
-                  ? "border-rose-200 bg-rose-50 text-rose-700"
-                  : r.severity === "medium"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : "border-slate-200 bg-slate-50 text-slate-600"
-              }`}
-            >
-              🔔 {r.message}
-            </Link>
-          ))}
-          {reminders.length > 3 && (
-            <Link href="/planning" className="text-xs text-slate-400 hover:text-ink">
-              +{reminders.length - 3} more in Planning → Reminders
-            </Link>
-          )}
-        </div>
-      )}
-
-      {!data && !error && <div className="text-slate-400">Loading…</div>}
-
-      {data && totals && (
-        <>
-          <p className="text-sm text-slate-500">
-            Showing <strong>{active}</strong> only. CAD and USD are tracked
-            separately and never added together.
-          </p>
-
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Stat label={`Income (${active})`} value={fmt(totals.income, active)} tone="good" />
-            <Stat label={`Expenses (${active})`} value={fmt(totals.expense, active)} tone="bad" />
-            <Stat
-              label={`Net (${active})`}
-              value={fmt(totals.net, active)}
-              tone={totals.net >= 0 ? "good" : "bad"}
+      {/* Footer */}
+      <div className="flex flex-none items-center justify-between gap-[10px] border-t border-line-faint bg-white px-4 py-[13px]">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate font-display text-[14.5px] font-semibold text-ink-900">
+            {vendor}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-[7px] w-[7px] rounded-pill"
+              style={{ background: color }}
             />
-            <Stat label={`Deductible (${active})`} value={fmt(totals.deductible, active)} />
-          </div>
+            <span className="text-[12px] text-ink-500">
+              {t.category || "Uncategorized"} · {date}
+            </span>
+          </span>
+        </div>
+        <span className="whitespace-nowrap font-mono text-[16px] font-bold text-ink-900">
+          {amountLabel}
+        </span>
+      </div>
+    </Link>
+  );
+}
 
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
-            <span>{totals.transaction_count} transactions</span>
-            {others.map((c) => {
-              const t = data.totals_by_currency[c];
-              return (
-                <span key={c} className="text-slate-400">
-                  {c}: net {fmt(t.net, c)} ({t.transaction_count} txns)
-                </span>
-              );
-            })}
-            {data.needs_review > 0 && (
-              <Link
-                href="/review"
-                className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-700 hover:bg-amber-200"
-              >
-                {data.needs_review} need review →
-              </Link>
-            )}
-          </div>
-
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 font-semibold text-ink">
-              Monthly trend ({active})
-            </h2>
-            <div className="space-y-2">
-              {data.monthly_trend.length === 0 && (
-                <p className="text-sm text-slate-400">No data yet.</p>
-              )}
-              {data.monthly_trend.map((m) => (
-                <div key={m.month} className="text-sm">
-                  <div className="mb-0.5 text-xs text-slate-400">{m.month}</div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-3 rounded bg-emerald-400"
-                      style={{ width: `${(m.income / maxMonth) * 50}%` }}
-                      title={`Income ${fmt(m.income, active)}`}
-                    />
-                    <div
-                      className="h-3 rounded bg-rose-400"
-                      style={{ width: `${(m.expense / maxMonth) * 50}%` }}
-                      title={`Expense ${fmt(m.expense, active)}`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-3 w-3 rounded bg-emerald-400" />
-                Income
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-3 w-3 rounded bg-rose-400" />
-                Expense
-              </span>
-            </div>
-          </section>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 font-semibold text-ink">
-                Top expense categories ({active})
-              </h2>
-              {data.by_category.map((c) => (
-                <BarRow
-                  key={c.name}
-                  name={c.name}
-                  total={c.total}
-                  max={maxCat}
-                  currency={active}
-                />
-              ))}
-            </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 font-semibold text-ink">
-                Top merchants ({active})
-              </h2>
-              {data.by_merchant.map((c) => (
-                <BarRow
-                  key={c.name}
-                  name={c.name}
-                  total={c.total}
-                  max={maxMerch}
-                  currency={active}
-                />
-              ))}
-            </section>
-          </div>
-        </>
-      )}
+function ReceiptLine({
+  wA,
+  wB,
+  dark,
+}: {
+  wA: string;
+  wB: string;
+  dark?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-[10px]">
+      <span
+        className="h-[6px] rounded-pill"
+        style={{ width: wA, background: dark ? "var(--line-strong)" : "#e6e0d4" }}
+      />
+      <span
+        className="h-[6px] rounded-pill"
+        style={{ width: wB, background: dark ? "#dfd9cd" : "#e6e0d4" }}
+      />
     </div>
   );
 }

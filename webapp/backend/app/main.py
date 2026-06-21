@@ -13,12 +13,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from . import (
-    accounts, auth, invest, learning, ledger, networth, planning, reminders,
-    scans, stack_settings, stack_sync,
+    accounts, assistant, auth, invest, learning, ledger, networth, planning,
+    reminders, scans, stack_settings, stack_sync, supabase_auth,
 )
 from .config import FRONTEND_ORIGIN
 
-app = FastAPI(title="Email Accountant API", version="1.0.0")
+app = FastAPI(title="Ledger API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +31,15 @@ app.add_middleware(
 _PUBLIC_PATHS = {"/api/health", "/api/auth/login"}
 
 
+def _resolve_user(token: str) -> Optional[str]:
+    """Accept a Supabase access token (verified via JWKS) or the legacy token."""
+    if supabase_auth.supabase_auth_enabled():
+        user = supabase_auth.user_from_token(token)
+        if user:
+            return user
+    return auth.verify_token(token)
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     """Gate every /api/* route behind a valid session token."""
@@ -41,13 +50,13 @@ async def require_login(request: Request, call_next):
         and request.method != "OPTIONS"
     ):
         token = (request.headers.get("authorization") or "").removeprefix("Bearer ").strip()
-        if not auth.verify_token(token):
+        if not _resolve_user(token):
             return JSONResponse({"detail": "unauthorized"}, status_code=401)
     return await call_next(request)
 
 
 def current_user(authorization: str = Header(default="")) -> str:
-    user = auth.verify_token((authorization or "").removeprefix("Bearer ").strip())
+    user = _resolve_user((authorization or "").removeprefix("Bearer ").strip())
     if not user:
         raise HTTPException(status_code=401, detail="unauthorized")
     return user
@@ -67,7 +76,8 @@ def login(payload: LoginIn) -> dict[str, Any]:
 
 @app.get("/api/auth/me")
 def auth_me(authorization: str = Header(default="")) -> dict[str, Any]:
-    return {"username": current_user(authorization)}
+    user = current_user(authorization)
+    return {"username": user, "email": user if "@" in user else None}
 
 
 class ChangePasswordIn(BaseModel):
@@ -88,7 +98,38 @@ def change_password(payload: ChangePasswordIn, authorization: str = Header(defau
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "years": ledger.available_years()}
+    return {
+        "status": "ok",
+        "years": ledger.available_years(),
+        "supabase_auth": supabase_auth.supabase_auth_enabled(),
+        "assistant": assistant.assistant_enabled(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Ask AI — spending assistant (Claude)
+# ---------------------------------------------------------------------------
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatIn(BaseModel):
+    messages: list[ChatMessage]
+    currency: str = "USD"
+
+
+@app.post("/api/assistant/chat")
+def assistant_chat(payload: ChatIn) -> dict[str, Any]:
+    try:
+        return assistant.chat(
+            [m.model_dump() for m in payload.messages], currency=payload.currency
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:  # pragma: no cover - upstream/network errors
+        raise HTTPException(status_code=502, detail=f"Assistant error: {exc}")
 
 
 @app.get("/api/years")

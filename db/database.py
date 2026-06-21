@@ -18,9 +18,17 @@ from typing import Optional, Any
 # ---------------------------------------------------------------------------
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+# Accept both the legacy service-role key name and the newer `sb_secret_...` key.
+SUPABASE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_KEY")
+    or os.environ.get("SUPABASE_SECRET_KEY")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+)
 DB_DIR = os.environ.get("EMAIL_ACCOUNTANT_DB_DIR", str(Path.home() / ".email-accountant" / "data"))
-DB_MODE = os.environ.get("EMAIL_ACCOUNTANT_DB", "sqlite")  # sqlite | supabase
+# Default to Supabase when cloud credentials are present; else local SQLite.
+DB_MODE = os.environ.get(
+    "EMAIL_ACCOUNTANT_DB", "supabase" if (SUPABASE_URL and SUPABASE_KEY) else "sqlite"
+)
 
 SCHEMA_VERSION = 1
 

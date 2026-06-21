@@ -1,10 +1,12 @@
+import { getAccessToken, getSupabase, supabaseConfigured } from "./supabase";
+
 // Empty/unset → same-origin relative calls (e.g. "/api/..."), which the Next
 // server proxies to the backend (see next.config.mjs rewrites). Set an absolute
 // URL to call the API directly instead.
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "";
 
-// ── Session token ──────────────────────────────────────────────────────────
+// ── Session token (legacy fallback when Supabase auth isn't configured) ──────
 const TOKEN_KEY = "ea_token";
 
 export function getToken(): string | null {
@@ -36,12 +38,23 @@ export function clearCache() {
   }
   window.location.reload();
 }
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const t = getToken();
+// Prefer the Supabase access token (JWT verified server-side via JWKS); fall
+// back to the legacy signed token when Supabase auth isn't configured.
+async function authHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
+  let t: string | null = null;
+  if (supabaseConfigured) t = await getAccessToken();
+  if (!t) t = getToken();
   return { ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(extra || {}) };
 }
 function handle401() {
   setToken(null);
+  if (supabaseConfigured) {
+    try {
+      getSupabase().auth.signOut();
+    } catch {
+      /* ignore */
+    }
+  }
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
     window.location.href = "/login";
   }
@@ -50,7 +63,7 @@ function handle401() {
 async function authFetch(path: string, init: RequestInit = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: authHeaders(init.headers as Record<string, string>),
+    headers: await authHeaders(init.headers as Record<string, string>),
   });
   if (res.status === 401) handle401();
   return res;
@@ -313,7 +326,7 @@ export type NetWorthProjection = {
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: authHeaders(),
+    headers: await authHeaders(),
   });
   if (res.status === 401) {
     handle401();
@@ -337,9 +350,29 @@ export const api = {
     setToken(data.token, remember);
     return data;
   },
-  me: () => get<{ username: string }>("/api/auth/me"),
-  logout() {
+  me: () => get<{ username: string; email?: string }>("/api/auth/me"),
+  async logout() {
     setToken(null);
+    if (supabaseConfigured) {
+      try {
+        await getSupabase().auth.signOut();
+      } catch {
+        /* ignore */
+      }
+    }
+  },
+  // ── Ask AI assistant ──
+  async assistant(messages: { role: "user" | "assistant"; content: string }[], currency = "USD") {
+    const res = await authFetch(`/api/assistant/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, currency }),
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail.detail || "Assistant unavailable");
+    }
+    return res.json() as Promise<{ reply: string; model: string }>;
   },
   async changePassword(old_password: string, new_password: string) {
     const res = await authFetch("/api/auth/change-password", {
@@ -542,8 +575,8 @@ export const api = {
     return res.json();
   },
   async applyRecommendations(currency = "USD") {
-    const res = await fetch(
-      `${API_BASE}/api/budgets/apply-recommendations?currency=${currency}`,
+    const res = await authFetch(
+      `/api/budgets/apply-recommendations?currency=${currency}`,
       { method: "POST" }
     );
     return res.json();
